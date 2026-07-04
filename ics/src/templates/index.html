@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="status-strip" aria-label="System status summary">
+  <article class="metric-card">
+    <span class="metric-label">System state</span>
+    <div class="metric-main"><span id="system-state-badge" class="badge badge-unknown">Loading</span></div>
+    <span id="system-message" class="metric-note">Waiting for status...</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Science camera</span>
+    <div id="science-summary" class="metric-main">--</div>
+    <span id="science-note" class="metric-note">--</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Telescope</span>
+    <div id="tcs-summary" class="metric-main">--</div>
+    <span id="tcs-note" class="metric-note">--</span>
+  </article>
+  <article class="metric-card">
+    <span class="metric-label">Last exposure</span>
+    <div id="last-exposure-summary" class="metric-main">None</div>
+    <span id="last-exposure-note" class="metric-note">--</span>
+  </article>
+</section>
+
+<section class="grid">
+  <article class="card span-2">
+    <div class="card-header">
+      <div>
+        <h2>System</h2>
+        <p>Top-level supervisor state and device connectivity.</p>
+      </div>
+    </div>
+    <div id="device-table" class="table-wrap"></div>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Telescope / ACE TCS</h2>
+        <p>Readback and small offset commands.</p>
+      </div>
+    </div>
+    <div id="tcs-status" class="key-grid"></div>
+    <form id="tcs-offset-form" class="control-panel">
+      <label>East offset, arcsec <input name="east_arcsec" type="number" step="0.1" value="0.0"></label>
+      <label>North offset, arcsec <input name="north_arcsec" type="number" step="0.1" value="0.0"></label>
+      <button>Request offset</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Science Camera / FLI Kepler</h2>
+        <p>Cooling, exposure setup, and current detector configuration.</p>
+      </div>
+    </div>
+    <div id="science-camera-status" class="key-grid"></div>
+    <form id="temperature-form" class="inline-form">
+      <label>Setpoint, C <input name="setpoint_c" type="number" step="0.1" value="-20"></label>
+      <button>Set temperature</button>
+    </form>
+    <form id="exposure-form" class="control-panel two-col-form">
+      <label>Object <input name="object_name" value="Test Object"></label>
+      <label>Image type
+        <select name="image_type">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="bias">Bias</option>
+          <option value="flat">Flat</option>
+          <option value="arc">Arc</option>
+        </select>
+      </label>
+      <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="1.0"></label>
+      <label>Binning X <input name="binning_x" type="number" value="1"></label>
+      <label>Binning Y <input name="binning_y" type="number" value="1"></label>
+      <label class="span-form">Comment <input name="comment"></label>
+      <div class="button-row span-form">
+        <button>Start exposure</button>
+        <button type="button" class="secondary" data-action="abort-exposure">Abort exposure</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Acquisition Camera</h2>
+        <p>Preview frames and target-centering workflow placeholder.</p>
+      </div>
+    </div>
+    <div id="acquisition-camera-status" class="key-grid"></div>
+    <form id="acq-preview-form" class="inline-form">
+      <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="0.2"></label>
+      <button>Capture preview</button>
+    </form>
+    <button data-action="center-target">Center target placeholder</button>
+    <div id="acq-output" class="result-box muted">No acquisition action yet.</div>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Fiber Stages</h2>
+        <p>Fiber entrance X/Y and focus motion axes.</p>
+      </div>
+    </div>
+    <div id="axis-status" class="table-wrap"></div>
+    <form id="motion-form" class="control-panel two-col-form">
+      <label>Axis
+        <select name="axis">
+          <option value="fiber_x">fiber_x</option>
+          <option value="fiber_y">fiber_y</option>
+          <option value="fiber_focus">fiber_focus</option>
+        </select>
+      </label>
+      <label>Absolute position <input name="position" type="number" step="1"></label>
+      <label>Relative delta <input name="delta" type="number" step="1"></label>
+      <div class="button-row span-form">
+        <button>Move selected axis</button>
+        <button type="button" class="secondary" data-action="home-axis">Home selected axis</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Camera Lens Focus / Pinefeat EF</h2>
+        <p>Instrument-side camera-lens focus position.</p>
+      </div>
+    </div>
+    <div id="lens-status" class="key-grid"></div>
+    <form id="lens-form" class="control-panel two-col-form">
+      <label>Absolute position <input name="position" type="number" step="1"></label>
+      <label>Relative delta <input name="delta" type="number" step="1" value="50"></label>
+      <div class="button-row span-form">
+        <button>Move lens</button>
+        <button type="button" class="secondary" data-action="focus-sweep">Focus sweep placeholder</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div>
+        <h2>Calibration</h2>
+        <p>Stub for bias, dark, flat, and arc sequences.</p>
+      </div>
+    </div>
+    <button data-action="run-calibration">Run calibration placeholder</button>
+    <div id="calibration-output" class="result-box muted">No calibration action yet.</div>
+  </article>
+
+  <article class="card span-2">
+    <div class="card-header">
+      <div>
+        <h2>Recent observation log</h2>
+        <p>Latest exposure records written by the supervisor.</p>
+      </div>
+    </div>
+    <div id="log-output" class="table-wrap empty-state">No log entries yet.</div>
+  </article>
+</section>
+{% endblock %}
