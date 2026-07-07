@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, render_template, request
+from pydantic import ValidationError
 
 from src.config import Config
 from src.data import DataManager
@@ -19,6 +20,18 @@ def create_app():
     supervisor = InstrumentSupervisor(devices, data_manager)
     app.extensions["ics_supervisor"] = supervisor
     app.extensions["ics_data_manager"] = data_manager
+
+    @app.errorhandler(ValidationError)
+    def handle_validation_error(error):
+        return jsonify({"error": "Invalid request", "details": error.errors()}), 400
+
+    @app.errorhandler(ValueError)
+    def handle_value_error(error):
+        return jsonify({"error": str(error)}), 400
+
+    @app.errorhandler(RuntimeError)
+    def handle_runtime_error(error):
+        return jsonify({"error": str(error)}), 409
 
     @app.get("/")
     def index():

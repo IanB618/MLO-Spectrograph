@@ -12,6 +12,7 @@ class MockScienceCamera:
         self.setpoint_c = -20.0
         self.temperature_c = 18.0
         self.exposing = False
+        self.binning = (1, 1)
         self.last_result = None
 
     def connect(self):
@@ -32,7 +33,7 @@ class MockScienceCamera:
             setpoint_c=self.setpoint_c,
             cooler_power_pct=35.0 if self.connected else 0.0,
             exposing=self.exposing,
-            binning=(1, 1),
+            binning=self.binning,
             roi=(0, 0, 2048, 2048),
             gain_mode="mock-low-gain",
         )
@@ -42,6 +43,7 @@ class MockScienceCamera:
 
     def expose(self, request: ExposureRequest) -> ExposureResult:
         self.exposing = True
+        self.binning = request.binning_tuple
         exposure_id = f"{time.strftime('%Y%m%dT%H%M%S')}_{request.image_type}_{uuid4().hex[:8]}"
         night_dir = self.data_root / time.strftime("%Y-%m-%d")
         night_dir.mkdir(parents=True, exist_ok=True)

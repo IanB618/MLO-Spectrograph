@@ -1,5 +1,6 @@
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -73,9 +74,13 @@ class ExposureRequest(BaseModel):
     exposure_s: float = Field(gt=0)
     image_type: ExposureType = ExposureType.LIGHT
     object_name: str = ""
-    binning_x: int = 1
-    binning_y: int = 1
+    binning: Literal["1x1", "2x2", "4x4"] = "1x1"
     comment: str = ""
+
+    @property
+    def binning_tuple(self) -> tuple[int, int]:
+        value = int(self.binning.split("x", maxsplit=1)[0])
+        return (value, value)
 
 
 class ExposureResult(BaseModel):

@@ -312,7 +312,7 @@ document.getElementById("temperature-form").addEventListener("submit", (event) =
 
 document.getElementById("exposure-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  const payload = numericFields(formPayload(event.target), ["exposure_s", "binning_x", "binning_y"]);
+  const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
     const result = await api("/api/science-camera/expose", {method: "POST", body: JSON.stringify(payload)});
     renderResult("calibration-output", "Exposure complete", {

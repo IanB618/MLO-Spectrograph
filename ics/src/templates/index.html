@@ -74,8 +74,13 @@
         </select>
       </label>
       <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="1.0"></label>
-      <label>Binning X <input name="binning_x" type="number" value="1"></label>
-      <label>Binning Y <input name="binning_y" type="number" value="1"></label>
+      <label>Binning
+        <select name="binning">
+          <option value="1x1">1x1</option>
+          <option value="2x2">2x2</option>
+          <option value="4x4">4x4</option>
+        </select>
+      </label>
       <label class="span-form">Comment <input name="comment"></label>
       <div class="button-row span-form">
         <button>Start exposure</button>
