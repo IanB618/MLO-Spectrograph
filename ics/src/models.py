@@ -2,6 +2,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
+from astropy.io import fits
+
 from pydantic import BaseModel, Field
 
 
@@ -78,9 +80,23 @@ class ExposureRequest(BaseModel):
     comment: str = ""
 
     @property
-    def binning_tuple(self) -> tuple[int, int]:
+    def binning_value(self) -> int:
         value = int(self.binning.split("x", maxsplit=1)[0])
-        return (value, value)
+        return value
+
+    @property
+    def binning_tuple(self) -> tuple[int, int]:
+        return self.binning_value, self.binning_value
+
+    def to_header(self) -> fits.Header:
+        header = fits.Header()
+        header.set("BINNING", self.binning, "Pixel binning setting")
+        header.set("IMAGETYP", self.image_type, "Image type (light, cal, dark, bias, etc.)")
+        header.set("OBJECT", self.object_name, "Target name")
+        header.set("EXPTIME", float(self.exposure_s), "[s] Requested exposure time")
+        if self.comment:
+            header.set("USERCMNT", self.comment, "Observer-defined comment")
+        return header
 
 
 class ExposureResult(BaseModel):
@@ -90,6 +106,10 @@ class ExposureResult(BaseModel):
     path: Path
     success: bool
     message: str = ""
+
+    @classmethod
+    def from_request(cls, request: ExposureRequest, exposure_id, path, success, message=None):
+        return NotImplemented
 
 
 class MotionMoveRequest(BaseModel):

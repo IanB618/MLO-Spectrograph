@@ -2,6 +2,10 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
+import numpy as np
+from astropy.io import fits
+from astropy.time import Time
+
 from src.models import AxisStatus, CameraStatus, DeviceStatus, ExposureRequest, ExposureResult, LensStatus, TcsStatus
 
 
@@ -31,7 +35,7 @@ class MockScienceCamera:
             state="mock",
             temperature_c=round(self.temperature_c, 2),
             setpoint_c=self.setpoint_c,
-            cooler_power_pct=35.0 if self.connected else 0.0,
+            cooler_power_pct=42.0 if self.connected else 0.0,
             exposing=self.exposing,
             binning=self.binning,
             roi=(0, 0, 2048, 2048),
@@ -44,15 +48,23 @@ class MockScienceCamera:
     def expose(self, request: ExposureRequest) -> ExposureResult:
         self.exposing = True
         self.binning = request.binning_tuple
-        exposure_id = f"{time.strftime('%Y%m%dT%H%M%S')}_{request.image_type}_{uuid4().hex[:8]}"
+        exp_start = Time.now()
+        exposure_id = f"raw_{exp_start.datetime.strftime('%Y%m%dT%H%M%S')}_{request.image_type}_{uuid4().hex[:8]}"
         night_dir = self.data_root / time.strftime("%Y-%m-%d")
         night_dir.mkdir(parents=True, exist_ok=True)
         path = night_dir / f"{exposure_id}.fits"
         time.sleep(min(request.exposure_s, 0.25))
-        path.write_text(
-            "Placeholder FITS file. Replace MockScienceCamera with INDI or libflipro backend.\n",
-            encoding="utf-8",
-        )
+        data = np.tile(np.arange(0, 65536, dtype=np.uint16), 64//(request.binning_value**2)).reshape((-1, 2048//request.binning_value))
+        exp_end = Time.now()
+        hdu = fits.PrimaryHDU(data=data)
+        hdu.header.set("INSTRUME", "MLO 50\" Fiber-Fed Spectrograph", "Instrument name")
+        hdu.header.set("CAMERA", "FLI Kepler KL400", "Camera name")
+        hdu.header.set("DETECTOR", "GSENSE 400", "Sensor name")
+        hdu.header.update(request.to_header())
+        hdu.header.set("DATE-OBS", exp_start.isot, "[UTC] Exposure start time")
+        hdu.header.set("DATE-END", exp_end.isot, "[UTC] Exposure end time")
+        hdu.header["COMMENT"] = "This is a dummy FITS file containing an incrementing test pattern."
+        hdu.writeto(path)
         self.exposing = False
         self.last_result = ExposureResult(
             exposure_id=exposure_id,
