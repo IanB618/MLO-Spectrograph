@@ -19,6 +19,15 @@
         <button data-action="clear-safe">Clear safe</button>
       </div>
     </header>
+    <section id="action-error" class="action-error hidden" role="alert" aria-live="assertive">
+      <div>
+        <div class="action-error-kicker" id="action-error-status">Request failed</div>
+        <h2 id="action-error-title">Instrument command failed</h2>
+        <p id="action-error-message"></p>
+        <dl id="action-error-details"></dl>
+      </div>
+      <button type="button" class="secondary" data-action="dismiss-error">Dismiss</button>
+    </section>
     <main>
       {% block content %}{% endblock %}
     </main>

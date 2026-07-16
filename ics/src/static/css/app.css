@@ -385,3 +385,66 @@ code {
     gap: 0.1rem;
   }
 }
+
+.action-error {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: start;
+  margin: 1rem 1.5rem 0;
+  padding: 1rem;
+  background: rgb(173 52 52 / 0.16);
+  border: 1px solid rgb(173 52 52 / 0.65);
+  border-radius: 0.6rem;
+  color: var(--text);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.18);
+}
+
+.action-error.hidden {
+  display: none;
+}
+
+.action-error-kicker {
+  margin-bottom: 0.25rem;
+  color: #ffb4b4;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.action-error h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.action-error p {
+  margin: 0.35rem 0 0;
+  color: #ffd7d7;
+  overflow-wrap: anywhere;
+}
+
+.action-error dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+}
+
+.action-error dl:empty {
+  display: none;
+}
+
+.action-error dl div {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.75rem;
+}
+
+.action-error dt {
+  color: #ffb4b4;
+}
+
+.action-error dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

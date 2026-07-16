@@ -24,7 +24,7 @@ class InstrumentSupervisor:
             self.devices.motion.connect()
             self.devices.tcs.connect()
             self.state = SystemState.IDLE
-            self.message = "All mock devices connected"
+            self.message = "All configured devices connected"
 
     def disconnect_all(self):
         with self._lock:
