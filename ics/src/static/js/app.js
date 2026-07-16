@@ -1,13 +1,63 @@
+class ApiError extends Error {
+  constructor({statusCode, statusText, title, message, details, hint, type}) {
+    super(message || title || "Request failed");
+    this.name = "ApiError";
+    this.statusCode = statusCode;
+    this.statusText = statusText;
+    this.title = title || "Request failed";
+    this.details = details || [];
+    this.hint = hint || "";
+    this.type = type || "";
+  }
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: {"Content-Type": "application/json"},
     ...options,
   });
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`${response.status}: ${text}`);
+    throw await parseApiError(response);
   }
   return response.json();
+}
+
+async function parseApiError(response) {
+  const contentType = response.headers.get("Content-Type") || "";
+  if (contentType.includes("application/json")) {
+    const payload = await response.json().catch(() => ({}));
+    return new ApiError({
+      statusCode: payload.status_code || response.status,
+      statusText: payload.status || response.statusText,
+      title: payload.error || "Request failed",
+      message: payload.message || response.statusText,
+      details: payload.details || [],
+      hint: payload.hint,
+      type: payload.type,
+    });
+  }
+
+  const text = await response.text();
+  const message = extractHtmlError(text) || response.statusText || "The server returned a non-JSON error response.";
+  return new ApiError({
+    statusCode: response.status,
+    statusText: response.statusText,
+    title: "Server returned HTML error page",
+    message,
+    details: [],
+    hint: "Check the Flask server log for the full traceback.",
+  });
+}
+
+function extractHtmlError(text) {
+  if (!text) {
+    return "";
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, "text/html");
+  const errorMessage = doc.querySelector(".errormsg")?.textContent?.trim();
+  const title = doc.querySelector("title")?.textContent?.trim();
+  return errorMessage || title || text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
 }
 
 function formPayload(form) {
@@ -77,6 +127,55 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function hideError() {
+  const panel = document.getElementById("action-error");
+  if (panel) {
+    panel.classList.add("hidden");
+  }
+}
+
+function normalizeErrorDetail(detail) {
+  if (typeof detail === "string") {
+    return ["Detail", detail];
+  }
+  if (detail && typeof detail === "object") {
+    const location = Array.isArray(detail.loc) ? detail.loc.join(".") : detail.loc;
+    const label = location || detail.type || "Detail";
+    const message = detail.msg || JSON.stringify(detail);
+    return [label, message];
+  }
+  return ["Detail", String(detail)];
+}
+
+function showError(error) {
+  const panel = document.getElementById("action-error");
+  if (!panel) {
+    alert(error.message || String(error));
+    return;
+  }
+
+  const status = [error.statusCode, error.statusText].filter(Boolean).join(" ");
+  const details = [];
+  if (error.type) {
+    details.push(["Error type", error.type]);
+  }
+  if (error.hint) {
+    details.push(["Suggested check", error.hint]);
+  }
+  for (const detail of error.details || []) {
+    details.push(normalizeErrorDetail(detail));
+  }
+
+  document.getElementById("action-error-status").textContent = status || "Request failed";
+  document.getElementById("action-error-title").textContent = error.title || "Instrument command failed";
+  document.getElementById("action-error-message").textContent = error.message || String(error);
+  document.getElementById("action-error-details").innerHTML = details.map(([key, value]) => `
+    <div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>
+  `).join("");
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 
 function renderKeyGrid(targetId, rows) {
@@ -254,7 +353,7 @@ async function runAndRefresh(task) {
     await refreshStatus();
     await refreshLog();
   } catch (error) {
-    alert(error.message);
+    showError(error);
   }
 }
 
@@ -264,7 +363,11 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "dismiss-error") {
+    hideError();
+  }
   if (action === "connect") {
+    hideError();
     runAndRefresh(() => api("/api/connect", {method: "POST"}));
   }
   if (action === "disconnect") {

@@ -1,5 +1,9 @@
+import logging
+from http import HTTPStatus
+
 from flask import Flask, jsonify, render_template, request
 from pydantic import ValidationError
+from werkzeug.exceptions import HTTPException
 
 from src.config import Config
 from src.data import DataManager
@@ -9,6 +13,24 @@ from src.models import ExposureRequest, LensMoveRequest, MotionMoveRequest
 from src.supervisor import InstrumentSupervisor
 
 
+logger = logging.getLogger(__name__)
+
+
+def _json_error(error, status_code, error_label, message=None, details=None, hint=None):
+    payload = {
+        "error": error_label,
+        "message": message or str(error),
+        "status": HTTPStatus(status_code).phrase,
+        "status_code": status_code,
+        "type": error.__class__.__name__,
+    }
+    if details:
+        payload["details"] = details
+    if hint:
+        payload["hint"] = hint
+    return jsonify(payload), status_code
+
+
 def create_app():
     configure_logging()
     config = Config()
@@ -16,22 +38,55 @@ def create_app():
     app.config.update(config.flask_config())
 
     data_manager = DataManager(app.config["ICS_DATA_ROOT"])
-    devices = build_device_bundle(app.config["ICS_BACKEND_MODE"], app.config["ICS_DATA_ROOT"])
+    devices = build_device_bundle(config)
     supervisor = InstrumentSupervisor(devices, data_manager)
     app.extensions["ics_supervisor"] = supervisor
     app.extensions["ics_data_manager"] = data_manager
 
     @app.errorhandler(ValidationError)
     def handle_validation_error(error):
-        return jsonify({"error": "Invalid request", "details": error.errors()}), 400
+        return _json_error(
+            error,
+            400,
+            "Invalid request",
+            message="The request parameters were not valid.",
+            details=error.errors(),
+        )
 
     @app.errorhandler(ValueError)
     def handle_value_error(error):
-        return jsonify({"error": str(error)}), 400
+        return _json_error(error, 400, "Invalid request")
+
+    @app.errorhandler(KeyError)
+    def handle_key_error(error):
+        return _json_error(error, 400, "Missing request field", message=f"Missing required field: {error}")
 
     @app.errorhandler(RuntimeError)
     def handle_runtime_error(error):
-        return jsonify({"error": str(error)}), 409
+        return _json_error(error, 409, "Runtime error")
+
+    @app.errorhandler(TimeoutError)
+    def handle_timeout_error(error):
+        return _json_error(
+            error,
+            504,
+            "INDI device timeout",
+            hint="Check that indiserver is running and that the configured INDI device names match the connected drivers.",
+        )
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(error):
+        return _json_error(error, error.code or 500, error.name, message=error.description)
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        logger.exception("Unhandled API error")
+        return _json_error(
+            error,
+            500,
+            "Internal server error",
+            message="An unexpected ICS server error occurred. Check the server log for the traceback.",
+        )
 
     @app.get("/")
     def index():
