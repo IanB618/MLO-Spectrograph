@@ -8,7 +8,8 @@ This software provides:
 - JSON API for device control
 - Supervisor state machine
 - Mock hardware backends for development
-- Adapter boundaries for INDI, ACE TCS, stepper motion, FLI Kepler, acquisition camera, and Pinefeat EF lens focus
+- PyIndi-backed INDI client adapters for the instrument-side CCD and focuser
+- Adapter boundaries for ACE TCS, stepper motion, acquisition camera, and future services
 - Observation sequence hooks
 - FITS/data-product placeholders
 - Basic tests
@@ -28,7 +29,7 @@ Open `http://<instrument-host>:5000` from the LAN.
 
 Copy `.env.example` to `.env` and adjust values.
 
-By default, all devices use mock backends.
+By default, all devices use mock backends. Set `ICS_BACKEND_MODE=indi` to use an INDI server for the science camera and lens controller.
 
 ## Architecture
 
@@ -37,12 +38,12 @@ Flask UI/API
     |
 InstrumentSupervisor
     |
-    +-- ScienceCameraBackend   mock, INDI, libflipro later
-    +-- AcquisitionCameraBackend mock, INDI later
-    +-- LensFocusBackend       mock, INDI/Pinefeat later
-    +-- MotionController       mock, serial/ethernet later
-    +-- TcsBackend             mock, ACE adapter later
-    +-- DataManager            FITS/logging placeholders
+    +-- ScienceCameraBackend    mock or PyIndi CCD client
+    +-- AcquisitionCameraBackend mock for now
+    +-- LensFocusBackend        mock or PyIndi focuser client
+    +-- MotionController        mock for now
+    +-- TcsBackend              mock / ACE adapter later
+    +-- DataManager             FITS/logging placeholders
 ```
 
 ## Development notes
