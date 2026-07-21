@@ -9,7 +9,7 @@ from src.config import Config
 from src.data import DataManager
 from src.devices import build_device_bundle
 from src.logging_config import configure_logging
-from src.models import ExposureRequest, LensMoveRequest, MotionMoveRequest
+from src.models import ExposureRequest, LensMoveRequest, MotionMoveRequest, TcsGotoRequest
 from src.supervisor import InstrumentSupervisor
 
 
@@ -165,6 +165,12 @@ def create_app():
     @app.post("/api/lens/focus-sweep")
     def api_lens_focus_sweep():
         return jsonify(supervisor.run_focus_sweep_placeholder())
+
+    @app.post("/api/tcs/goto-j2000")
+    def api_tcs_goto_j2000():
+        request_model = TcsGotoRequest(**request.get_json())
+        result = supervisor.tcs_go_to_j2000(request_model)
+        return jsonify(result)
 
     @app.post("/api/tcs/offset")
     def api_tcs_offset():

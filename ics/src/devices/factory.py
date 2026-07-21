@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.config import Config
+from src.devices.ace_tcs import AceTcs, AceTelescopeConfig
 from src.devices.indi import IndiCcdCamera, IndiFocuser
 from src.devices.mock import MockAcquisitionCamera, MockLensFocus, MockMotionController, MockScienceCamera, MockTcs
 
@@ -16,13 +17,15 @@ class DeviceBundle:
 
 
 def build_device_bundle(config: Config) -> DeviceBundle:
+    tcs = _build_tcs(config)
+
     if config.backend_mode == "mock":
         return DeviceBundle(
             science_camera=MockScienceCamera(config.data_root),
             acquisition_camera=MockAcquisitionCamera(config.data_root),
             lens=MockLensFocus(),
             motion=MockMotionController(),
-            tcs=MockTcs(),
+            tcs=tcs,
         )
 
     if config.backend_mode == "indi":
@@ -45,7 +48,26 @@ def build_device_bundle(config: Config) -> DeviceBundle:
                 command_timeout_s=config.indi_command_timeout_s,
             ),
             motion=MockMotionController(),
-            tcs=MockTcs(),
+            tcs=tcs,
         )
 
     raise ValueError(f"Unsupported backend mode: {config.backend_mode}")
+
+
+def _build_tcs(config: Config):
+    if config.tcs_backend == "mock":
+        return MockTcs()
+
+    if config.tcs_backend == "ace":
+        return AceTcs(
+            AceTelescopeConfig(
+                host=config.ace_host,
+                port=config.ace_port,
+                node=config.ace_node,
+                instrument=config.ace_telescope_name,
+                username=config.ace_username,
+                password=config.ace_password,
+            )
+        )
+
+    raise ValueError(f"Unsupported TCS backend: {config.tcs_backend}")

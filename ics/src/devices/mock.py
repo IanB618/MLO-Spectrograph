@@ -5,6 +5,7 @@ from uuid import uuid4
 import numpy as np
 from astropy.io import fits
 from astropy.time import Time
+from astropy.coordinates import SkyCoord
 
 from src.models import AxisStatus, CameraStatus, DeviceStatus, ExposureRequest, ExposureResult, LensStatus, TcsStatus
 
@@ -204,12 +205,21 @@ class MockTcs:
         self.connected = False
         self.east_offset_arcsec = 0.0
         self.north_offset_arcsec = 0.0
+        self.ra_deg = 188.73625
+        self.dec_deg = 12.58222
 
     def connect(self):
         self.connected = True
 
     def disconnect(self):
         self.connected = False
+
+    def skycoord(self) -> SkyCoord:
+        return SkyCoord(ra=self.ra_deg, dec=self.dec_deg,
+                        unit="deg", frame="icrs")
+
+    def radec_str(self) -> tuple[str]:
+        return self.skycoord.to_string("hmsdms")
 
     def status(self) -> TcsStatus:
         return TcsStatus(
@@ -218,8 +228,8 @@ class MockTcs:
             ready=self.connected,
             state="mock",
             target_name="Mock Target",
-            ra="12:34:56.7",
-            dec="+12:34:56",
+            ra=f"{self.ra_deg:.6f} deg",
+            dec=f"{self.dec_deg:.6f} deg",
             altitude_deg=62.1,
             azimuth_deg=211.3,
             airmass=1.13,
@@ -227,10 +237,24 @@ class MockTcs:
             guiding=False,
         )
 
+    def go_to_j2000(self, ra_deg: float, dec_deg: float):
+        self.ra_deg = float(ra_deg)
+        self.dec_deg = float(dec_deg)
+        return {
+            "ra_deg": self.ra_deg,
+            "dec_deg": self.dec_deg,
+            "message": "Mock telescope slew requested",
+        }
+
     def offset(self, east_arcsec: float, north_arcsec: float):
         self.east_offset_arcsec += east_arcsec
         self.north_offset_arcsec += north_arcsec
+        self.ra_deg += east_arcsec / 3600.0
+        self.dec_deg += north_arcsec / 3600.0
         return {
             "east_offset_arcsec": self.east_offset_arcsec,
             "north_offset_arcsec": self.north_offset_arcsec,
+            "commanded_ra_deg": self.ra_deg,
+            "commanded_dec_deg": self.dec_deg,
+            "method": "mock linear offset",
         }

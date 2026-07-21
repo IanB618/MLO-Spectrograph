@@ -87,5 +87,9 @@ class TcsBackend(DeviceBackend):
         raise NotImplementedError
 
     @abstractmethod
+    def go_to_j2000(self, ra_deg: float, dec_deg: float):
+        raise NotImplementedError
+
+    @abstractmethod
     def offset(self, east_arcsec: float, north_arcsec: float):
         raise NotImplementedError
