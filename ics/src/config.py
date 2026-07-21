@@ -20,6 +20,13 @@ class Config:
         self.indi_blob_property = os.getenv("ICS_INDI_CCD_BLOB_PROPERTY", "CCD1")
         self.indi_connect_timeout_s = float(os.getenv("ICS_INDI_CONNECT_TIMEOUT_S", "10"))
         self.indi_command_timeout_s = float(os.getenv("ICS_INDI_COMMAND_TIMEOUT_S", "30"))
+        self.tcs_backend = os.getenv("ICS_TCS_BACKEND", "mock")
+        self.ace_host = os.getenv("ICS_ACE_HOST", "127.0.0.1")
+        self.ace_port = int(os.getenv("ICS_ACE_PORT", "9889"))
+        self.ace_node = os.getenv("ICS_ACE_NODE", "Telescope PC")
+        self.ace_telescope_name = os.getenv("ICS_ACE_TELESCOPE_NAME", "Telescope")
+        self.ace_username = os.getenv("ICS_ACE_USERNAME") or None
+        self.ace_password = os.getenv("ICS_ACE_PASSWORD") or None
 
     def flask_config(self):
         return {
@@ -36,4 +43,11 @@ class Config:
             "ICS_INDI_CCD_BLOB_PROPERTY": self.indi_blob_property,
             "ICS_INDI_CONNECT_TIMEOUT_S": self.indi_connect_timeout_s,
             "ICS_INDI_COMMAND_TIMEOUT_S": self.indi_command_timeout_s,
+            "ICS_TCS_BACKEND": self.tcs_backend,
+            "ICS_ACE_HOST": self.ace_host,
+            "ICS_ACE_PORT": self.ace_port,
+            "ICS_ACE_NODE": self.ace_node,
+            "ICS_ACE_TELESCOPE_NAME": self.ace_telescope_name,
+            "ICS_ACE_USERNAME": self.ace_username,
+            "ICS_ACE_PASSWORD": self.ace_password,
         }

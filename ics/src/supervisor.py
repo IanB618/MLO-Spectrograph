@@ -2,7 +2,7 @@ import logging
 from threading import Lock
 
 from src.data import DataManager
-from src.models import ExposureRequest, ExposureResult, LensMoveRequest, MotionMoveRequest, SystemSnapshot, SystemState
+from src.models import ExposureRequest, ExposureResult, LensMoveRequest, MotionMoveRequest, SystemSnapshot, SystemState, TcsGotoRequest
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class InstrumentSupervisor:
             self.devices.motion.connect()
             self.devices.tcs.connect()
             self.state = SystemState.IDLE
-            self.message = "All configured devices connected"
+            self.message = "All devices connected"
 
     def disconnect_all(self):
         with self._lock:
@@ -100,6 +100,11 @@ class InstrumentSupervisor:
                 raise ValueError("Lens request requires position or delta")
             self.state = SystemState.IDLE
             self.message = "Lens focus moved"
+
+    def tcs_go_to_j2000(self, request: TcsGotoRequest):
+        result = self.devices.tcs.go_to_j2000(request.ra_deg, request.dec_deg)
+        self.message = "TCS J2000 slew requested"
+        return result
 
     def tcs_offset(self, east_arcsec: float, north_arcsec: float):
         result = self.devices.tcs.offset(east_arcsec, north_arcsec)

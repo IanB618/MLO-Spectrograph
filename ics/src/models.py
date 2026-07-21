@@ -123,6 +123,11 @@ class LensMoveRequest(BaseModel):
     delta: int | None = None
 
 
+class TcsGotoRequest(BaseModel):
+    ra_deg: float = Field(ge=0, lt=360)
+    dec_deg: float = Field(ge=-90, le=90)
+
+
 class SystemSnapshot(BaseModel):
     state: SystemState
     message: str = ""

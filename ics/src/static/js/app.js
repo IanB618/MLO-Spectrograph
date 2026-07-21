@@ -448,14 +448,30 @@ document.getElementById("lens-form").addEventListener("submit", (event) => {
   runAndRefresh(() => api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)}));
 });
 
+document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const payload = numericFields(formPayload(event.target), ["ra_deg", "dec_deg"]);
+  runAndRefresh(async () => {
+    const result = await api("/api/tcs/goto-j2000", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("acq-output", "TCS J2000 slew requested", {
+      "RA": `${formatNumber(result.ra_deg, 6)} deg`,
+      "Dec": `${formatNumber(result.dec_deg, 6)} deg`,
+      "Message": result.message || "--",
+    });
+  });
+});
+
 document.getElementById("tcs-offset-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["east_arcsec", "north_arcsec"]);
   runAndRefresh(async () => {
     const result = await api("/api/tcs/offset", {method: "POST", body: JSON.stringify(payload)});
     renderResult("acq-output", "TCS offset requested", {
-      "Total east offset": `${result.east_offset_arcsec} arcsec`,
-      "Total north offset": `${result.north_offset_arcsec} arcsec`,
+      "East offset": `${formatNumber(result.east_offset_arcsec, 2)} arcsec`,
+      "North offset": `${formatNumber(result.north_offset_arcsec, 2)} arcsec`,
+      "Commanded RA": `${formatNumber(result.commanded_ra_deg, 6)} deg`,
+      "Commanded Dec": `${formatNumber(result.commanded_dec_deg, 6)} deg`,
+      "Method": result.method || "--",
     });
   });
 });
