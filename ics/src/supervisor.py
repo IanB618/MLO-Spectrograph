@@ -68,10 +68,10 @@ class InstrumentSupervisor:
     def capture_acquisition_preview(self, exposure_s: float = 0.2):
         with self._lock:
             self.state = SystemState.ACQUIRING
-            self.message = "Capturing acquisition preview"
+            self.message = "Capturing guide camera preview"
             path = self.devices.acquisition_camera.capture_preview(exposure_s)
             self.state = SystemState.IDLE
-            self.message = "Acquisition preview complete"
+            self.message = "Guide camera preview complete"
             return {"path": path}
 
     def move_axis(self, request: MotionMoveRequest):
@@ -82,12 +82,12 @@ class InstrumentSupervisor:
                 self.devices.motion.move_relative(request.axis, request.delta)
             else:
                 raise ValueError("Motion request requires position or delta")
-            self.message = f"Moved {request.axis}"
+            self.message = f"Moved guide stage axis {request.axis}"
 
     def home_axis(self, axis: str):
         with self._lock:
             self.devices.motion.home(axis)
-            self.message = f"Homed {axis}"
+            self.message = f"Homed guide stage axis {axis}"
 
     def move_lens(self, request: LensMoveRequest):
         with self._lock:
@@ -146,7 +146,7 @@ class InstrumentSupervisor:
     def center_target_placeholder(self):
         with self._lock:
             self.state = SystemState.ACQUIRING
-            self.message = "Target centering placeholder complete"
+            self.message = "Guide camera target centering placeholder complete"
             self.state = SystemState.IDLE
             return {"dx_arcsec": 0.0, "dy_arcsec": 0.0}
 
