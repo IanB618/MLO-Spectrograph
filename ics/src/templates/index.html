@@ -97,8 +97,8 @@
   <article class="card">
     <div class="card-header">
       <div>
-        <h2>Acquisition Camera</h2>
-        <p>Preview frames and target-centering workflow placeholder.</p>
+        <h2>Guide Camera / Acquisition</h2>
+        <p>Uses the existing telescope guide camera through ACE for preview and target-centering workflows.</p>
       </div>
     </div>
     <div id="acquisition-camera-status" class="key-grid"></div>
@@ -113,17 +113,17 @@
   <article class="card">
     <div class="card-header">
       <div>
-        <h2>Fiber Stages</h2>
-        <p>Fiber entrance X/Y and focus motion axes.</p>
+        <h2>Guide Camera Stage</h2>
+        <p>Existing guide-camera stage axes controlled through ACE.</p>
       </div>
     </div>
     <div id="axis-status" class="table-wrap"></div>
     <form id="motion-form" class="control-panel two-col-form">
       <label>Axis
         <select name="axis">
-          <option value="fiber_x">fiber_x</option>
-          <option value="fiber_y">fiber_y</option>
-          <option value="fiber_focus">fiber_focus</option>
+          <option value="stage_x">X</option>
+          <option value="stage_y">Y</option>
+          <option value="stage_focus">Z</option>
         </select>
       </label>
       <label>Absolute position <input name="position" type="number" step="1"></label>

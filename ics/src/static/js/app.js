@@ -191,7 +191,7 @@ function renderKeyGrid(targetId, rows) {
 function renderDeviceTable(status) {
   const devices = [
     ["Science camera", status.science_camera],
-    ["Acquisition camera", status.acquisition_camera],
+    ["Guide camera / acquisition", status.acquisition_camera],
     ["Lens controller", status.lens],
     ["ACE TCS", status.tcs],
   ];
@@ -234,6 +234,19 @@ function renderAxisTable(axes) {
       </tbody>
     </table>
   `;
+  updateMotionAxisOptions(axes);
+}
+
+function updateMotionAxisOptions(axes) {
+  const select = document.querySelector('#motion-form select[name="axis"]');
+  if (!select || !axes.length) {
+    return;
+  }
+  const current = select.value;
+  select.innerHTML = axes.map((axis) => `<option value="${escapeHtml(axis.name)}">${escapeHtml(axis.name)}</option>`).join("");
+  if (axes.some((axis) => axis.name === current)) {
+    select.value = current;
+  }
 }
 
 function renderLog(log) {
@@ -327,6 +340,7 @@ function updateStatus(status) {
     ["Exposing", formatBool(status.acquisition_camera.exposing)],
     ["Binning", formatTuple(status.acquisition_camera.binning)],
     ["ROI", formatTuple(status.acquisition_camera.roi)],
+    ["Readout mode", status.acquisition_camera.gain_mode || "--"],
   ]);
   renderAxisTable(status.axes || []);
   renderKeyGrid("lens-status", [
@@ -432,7 +446,7 @@ document.getElementById("acq-preview-form").addEventListener("submit", (event) =
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
     const result = await api("/api/acquisition/preview", {method: "POST", body: JSON.stringify(payload)});
-    renderResult("acq-output", "Preview captured", {"Preview file": result.path});
+    renderResult("acq-output", "Guide camera preview captured", {"ACE result": result.path});
   });
 });
 

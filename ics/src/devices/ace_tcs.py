@@ -3,7 +3,7 @@ import logging
 import math
 from dataclasses import dataclass
 
-from src.models import TcsStatus
+from src.models import AxisStatus, CameraStatus, TcsStatus
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +13,77 @@ class AceUnavailableError(RuntimeError):
 
 
 @dataclass
-class AceTelescopeConfig:
+class AceConnectionConfig:
     host: str
     port: int
-    node: str
-    instrument: str
     username: str | None = None
     password: str | None = None
+
+
+@dataclass
+class AceTelescopeConfig(AceConnectionConfig):
+    node: str = "Telescope PC"
+    instrument: str = "Telescope"
+
+
+@dataclass
+class AceCameraConfig(AceConnectionConfig):
+    node: str = "Telescope PC"
+    instrument: str = "Guide Camera"
+
+
+@dataclass
+class AceStageAxisConfig:
+    axis: str
+    node: str
+    instrument: str
+    units: str = "steps"
+
+
+@dataclass
+class AceStageConfig(AceConnectionConfig):
+    axes: list[AceStageAxisConfig] | None = None
+
+
+def _load_ace_module(name: str):
+    try:
+        return importlib.import_module(name)
+    except ImportError as error:
+        raise AceUnavailableError(
+            "ACE Python modules are not installed or are not on PYTHONPATH. "
+            "Install ACE Connector's Python interface on this host."
+        ) from error
+
+
+def _open_connection(config: AceConnectionConfig):
+    ace_syscore = _load_ace_module("ace.syscore")
+    connection = ace_syscore.AceConnection(config.host, config.port)
+    if config.username and config.password:
+        connection.authenticate(config.username, config.password)
+    return connection
+
+
+def _constant_name(container, value) -> str:
+    if container is None:
+        return str(value)
+    for name in dir(container):
+        if name.startswith("_"):
+            continue
+        try:
+            if getattr(container, name) == value:
+                return name.lower()
+        except Exception:
+            continue
+    return str(value)
+
+
+def _safe_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 class AceTcs:
@@ -39,10 +103,8 @@ class AceTcs:
         self.last_message = "offline"
 
     def connect(self):
-        ace_syscore, ace_telescope = self._load_ace_modules()
-        self.connection = ace_syscore.AceConnection(self.config.host, self.config.port)
-        if self.config.username and self.config.password:
-            self.connection.authenticate(self.config.username, self.config.password)
+        ace_telescope = _load_ace_module("ace.telescope")
+        self.connection = _open_connection(self.config)
         self.telescope = ace_telescope.Telescope(self.connection, self.config.node, self.config.instrument)
         self.connected = True
         self.last_message = f"Connected to ACE telescope {self.config.node}/{self.config.instrument}"
@@ -127,17 +189,6 @@ class AceTcs:
             "message": self.last_message,
         }
 
-    def _load_ace_modules(self):
-        try:
-            ace_syscore = importlib.import_module("ace.syscore")
-            ace_telescope = importlib.import_module("ace.telescope")
-        except ImportError as error:
-            raise AceUnavailableError(
-                "ACE Python modules are not installed or are not on PYTHONPATH. "
-                "Install ACE Connector's Python interface on this host."
-            ) from error
-        return ace_syscore, ace_telescope
-
     def _require_telescope(self):
         if not self.connected or self.telescope is None:
             raise RuntimeError("ACE telescope is not connected")
@@ -154,10 +205,7 @@ class AceTcs:
     def _position_value(self, position, name: str) -> float | None:
         if position is None:
             return None
-        value = getattr(position, name, None)
-        if value is None:
-            return None
-        return float(value)
+        return _safe_float(getattr(position, name, None))
 
     def _format_degrees(self, value: float | None) -> str | None:
         if value is None:
@@ -169,3 +217,177 @@ class AceTcs:
             raise ValueError("RA must be in degrees in the range [0, 360)")
         if not -90.0 <= float(dec_deg) <= 90.0:
             raise ValueError("Dec must be in degrees in the range [-90, 90]")
+
+
+class AceGuideCamera:
+    """ACE Connector adapter for the existing telescope guide camera.
+
+    The documented ACE camera interface supports status fields and blocking
+    exposures saved by ACE. It does not document a method for retrieving the
+    saved filename or image bytes, so capture_preview() returns an operation
+    message rather than a local preview file path.
+    """
+
+    def __init__(self, config: AceCameraConfig):
+        self.config = config
+        self.connection = None
+        self.camera = None
+        self.ace_camera = None
+        self.connected = False
+        self.last_message = "offline"
+
+    def connect(self):
+        self.ace_camera = _load_ace_module("ace.camera")
+        self.connection = _open_connection(self.config)
+        self.camera = self.ace_camera.Camera(self.connection, self.config.node, self.config.instrument)
+        self.connected = True
+        self.last_message = f"Connected to ACE guide camera {self.config.node}/{self.config.instrument}"
+
+    def disconnect(self):
+        self.camera = None
+        self.connection = None
+        self.connected = False
+        self.last_message = "Disconnected from ACE guide camera"
+
+    def status(self) -> CameraStatus:
+        if not self.connected or self.camera is None:
+            return CameraStatus(
+                name="ACE Guide Camera",
+                connected=False,
+                ready=False,
+                state="offline",
+                message=self.last_message,
+            )
+
+        state_value = self._safe_attr("state")
+        state_label = _constant_name(getattr(self.ace_camera, "state", None), state_value)
+        exposing = state_label == "exposing"
+        return CameraStatus(
+            name="ACE Guide Camera",
+            connected=True,
+            ready=not exposing,
+            state=state_label,
+            message=self.last_message,
+            temperature_c=_safe_float(self._safe_attr("temperature")),
+            setpoint_c=_safe_float(self._safe_attr("setpoint")),
+            exposing=exposing,
+            binning=(1, 1),
+            roi=None,
+            gain_mode=str(self._safe_attr("readout_mode")) if self._safe_attr("readout_mode") is not None else None,
+        )
+
+    def capture_preview(self, exposure_s: float = 0.2) -> str:
+        if not self.connected or self.camera is None or self.ace_camera is None:
+            raise RuntimeError("ACE guide camera is not connected")
+
+        exposure_type = self.ace_camera.exposure_type.LIGHT
+        self.camera.expose(float(exposure_s), type=exposure_type, bin_x=1, bin_y=1, save=True, block=True)
+        self.last_message = (
+            f"ACE guide camera exposure complete: {exposure_s:.3f} s. "
+            "Image save/location is managed by ACE."
+        )
+        return self.last_message
+
+    def _safe_attr(self, name: str):
+        try:
+            return getattr(self.camera, name)
+        except Exception:
+            logger.exception("ACE guide camera status read failed for %s", name)
+            self.last_message = f"ACE guide camera status read failed for {name}"
+            return None
+
+
+class AceGuideStageMotion:
+    """ACE Connector adapter for the existing guide-camera stage.
+
+    This maps each configured stage axis to an ACE Focuser instrument. That is
+    the closest documented ACE interface for a single controllable position with
+    position, target, limits, go(), and stop().
+    """
+
+    def __init__(self, config: AceStageConfig):
+        self.config = config
+        self.connection = None
+        self.ace_focuser = None
+        self.focusers = {}
+        self.connected = False
+
+    def connect(self):
+        self.ace_focuser = _load_ace_module("ace.focuser")
+        self.connection = _open_connection(self.config)
+        self.focusers = {}
+        for axis_config in self.config.axes or []:
+            self.focusers[axis_config.axis] = {
+                "config": axis_config,
+                "device": self.ace_focuser.Focuser(self.connection, axis_config.node, axis_config.instrument),
+            }
+        self.connected = True
+
+    def disconnect(self):
+        self.focusers = {}
+        self.connection = None
+        self.connected = False
+
+    def axes(self) -> list[AxisStatus]:
+        statuses = []
+        for axis, entry in self.focusers.items():
+            focuser = entry["device"]
+            axis_config = entry["config"]
+            state_value = self._safe_get(focuser, "state")
+            state_label = _constant_name(getattr(self.ace_focuser, "state", None), state_value)
+            moving = state_label in {"moving_fwd", "moving_rev"}
+            statuses.append(
+                AxisStatus(
+                    name=axis,
+                    position=_safe_float(self._safe_get(focuser, "position")) or 0.0,
+                    units=axis_config.units,
+                    homed=self.connected,
+                    moving=moving,
+                    min_limit=_safe_float(self._safe_get(focuser, "minimum")),
+                    max_limit=_safe_float(self._safe_get(focuser, "maximum")),
+                    fault=None,
+                )
+            )
+        return statuses
+
+    def home(self, axis: str):
+        focuser = self._get_focuser(axis)
+        focuser.go_to_minimum()
+
+    def move_absolute(self, axis: str, position: float):
+        focuser = self._get_focuser(axis)
+        minimum = _safe_float(self._safe_get(focuser, "minimum"))
+        maximum = _safe_float(self._safe_get(focuser, "maximum"))
+        if minimum is not None and position < minimum:
+            raise ValueError(f"{axis} move below ACE minimum limit")
+        if maximum is not None and position > maximum:
+            raise ValueError(f"{axis} move above ACE maximum limit")
+        focuser.go(float(position))
+
+    def move_relative(self, axis: str, delta: float):
+        focuser = self._get_focuser(axis)
+        current = _safe_float(self._safe_get(focuser, "position"))
+        if current is None:
+            raise RuntimeError(f"ACE guide stage axis {axis} did not report a usable position")
+        self.move_absolute(axis, current + float(delta))
+
+    def stop(self, axis: str | None = None):
+        if axis is not None:
+            self._get_focuser(axis).stop()
+            return
+        for entry in self.focusers.values():
+            entry["device"].stop()
+
+    def _get_focuser(self, axis: str):
+        if not self.connected:
+            raise RuntimeError("ACE guide stage is not connected")
+        if axis not in self.focusers:
+            raise KeyError(f"Unknown ACE guide stage axis: {axis}")
+        return self.focusers[axis]["device"]
+
+    def _safe_get(self, focuser, name: str):
+        try:
+            return getattr(focuser, name)
+        except Exception:
+            logger.exception("ACE guide stage status read failed for %s", name)
+            return None

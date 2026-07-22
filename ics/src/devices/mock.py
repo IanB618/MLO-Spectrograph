@@ -95,7 +95,7 @@ class MockAcquisitionCamera:
 
     def status(self) -> CameraStatus:
         return CameraStatus(
-            name="Acquisition Camera",
+            name="Guide Camera / Acquisition",
             connected=self.connected,
             ready=self.connected,
             state="mock",
@@ -108,8 +108,8 @@ class MockAcquisitionCamera:
     def capture_preview(self, exposure_s: float = 0.2) -> str:
         preview_dir = self.data_root / "previews"
         preview_dir.mkdir(parents=True, exist_ok=True)
-        path = preview_dir / "latest_acq_preview.txt"
-        path.write_text(f"Mock acquisition preview, exposure_s={exposure_s}\n", encoding="utf-8")
+        path = preview_dir / "latest_guide_preview.txt"
+        path.write_text(f"Mock guide camera preview, exposure_s={exposure_s}\n", encoding="utf-8")
         self.last_preview_path = str(path)
         return self.last_preview_path
 
@@ -152,9 +152,9 @@ class MockMotionController:
     def __init__(self):
         self.connected = False
         self._axes = {
-            "fiber_x": AxisStatus(name="fiber_x", units="steps", min_limit=-50000, max_limit=50000),
-            "fiber_y": AxisStatus(name="fiber_y", units="steps", min_limit=-50000, max_limit=50000),
-            "fiber_focus": AxisStatus(name="fiber_focus", units="steps", min_limit=-20000, max_limit=20000),
+            "stage_x": AxisStatus(name="stage_x", units="steps", min_limit=-50000, max_limit=50000),
+            "stage_y": AxisStatus(name="stage_y", units="steps", min_limit=-50000, max_limit=50000),
+            "stage_focus": AxisStatus(name="stage_focus", units="steps", min_limit=-20000, max_limit=20000),
         }
 
     def connect(self):
