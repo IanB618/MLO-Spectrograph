@@ -242,14 +242,85 @@ class LongSlitWCS(SlicedLowLevelWCS):
         """The underlying serializable three-dimensional FITS WCS."""
         return self._parent_wcs
 
-    def to_header(self, *args, **kwargs):
+    @staticmethod
+    def _convert_header_to_cd(header, key=None):
         """
-        Serialize the underlying three-dimensional FITS WCS.
+        Convert a FITS WCS header from PC+CDELT to CD notation.
 
-        The returned header includes the dummy cross-slit axis.
+        The input header is modified in place and returned.
         """
-        return self._parent_wcs.to_header(*args, **kwargs)
+        suffix = "" if key in (None, " ") else key
 
-    def to_fits(self, *args, **kwargs):
-        """Serialize the underlying WCS as an HDUList."""
-        return self._parent_wcs.to_fits(*args, **kwargs)
+        wcsaxes_key = f"WCSAXES{suffix}"
+        naxis = int(
+            header.get(
+                wcsaxes_key,
+                max(
+                    int(keyword[5:-len(suffix) or None])
+                    for keyword in header
+                    if keyword.startswith("CTYPE")
+                    and keyword.endswith(suffix)
+                ),
+            )
+        )
+
+        cdelt = np.array(
+            [
+                header.get(f"CDELT{axis}{suffix}", 1.0)
+                for axis in range(1, naxis + 1)
+            ],
+            dtype=float,
+        )
+
+        pc = np.eye(naxis, dtype=float)
+
+        for world_axis in range(1, naxis + 1):
+            for pixel_axis in range(1, naxis + 1):
+                keyword = (
+                    f"PC{world_axis}_{pixel_axis}{suffix}"
+                )
+                if keyword in header:
+                    pc[world_axis - 1, pixel_axis - 1] = header[keyword]
+
+        cd = cdelt[:, np.newaxis] * pc
+
+        for world_axis in range(1, naxis + 1):
+            header.remove(
+                f"CDELT{world_axis}{suffix}",
+                ignore_missing=True,
+            )
+
+            for pixel_axis in range(1, naxis + 1):
+                header.remove(
+                    f"PC{world_axis}_{pixel_axis}{suffix}",
+                    ignore_missing=True,
+                )
+
+        # Write the complete matrix, including zeros. Although omitted CD
+        # elements default to zero, writing all elements is less ambiguous
+        # for external FITS readers.
+        for world_axis in range(1, naxis + 1):
+            for pixel_axis in range(1, naxis + 1):
+                header[
+                    f"CD{world_axis}_{pixel_axis}{suffix}"
+                ] = float(
+                    cd[world_axis - 1, pixel_axis - 1]
+                )
+
+        return header
+
+    def to_header(self, relax=None, key=None):
+        """
+        Serialize the parent FITS WCS using CDi_j notation.
+
+        PCi_j and CDELTi keywords are omitted.
+        """
+        header = self._parent_wcs.to_header(relax=relax, key=key)
+        return self._convert_header_to_cd(header, key=key)
+
+    def to_fits(self, relax=None, key=None):
+        """Serialize the parent WCS as an HDUList using CDi_j notation."""
+        hdulist = self._parent_wcs.to_fits(*args, **kwargs)
+
+        hdulist[0].header = self._convert_header_to_cd(hdulist[0].header, key=key)
+        return hdulist
