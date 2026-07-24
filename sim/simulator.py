@@ -8,6 +8,15 @@ import numpy as np
 import pandas as pd
 
 
+H_ERG_S = 6.62607015e-27
+C_CM_S = 2.99792458e10
+
+TELESCOPE_DIAMETER_CM = 125.0
+OBSTRUCTION_DIAMETER_CM = 0.30 * TELESCOPE_DIAMETER_CM
+
+TELESCOPE_AREA_CM2 = np.pi*(TELESCOPE_DIAMETER_CM**2 - OBSTRUCTION_DIAMETER_CM**2)/4
+
+
 @dataclass
 class ThroughputCurve:
     wavelength: np.ndarray
@@ -110,7 +119,7 @@ class InstrumentSimulator:
         self,
         wavelength: np.ndarray,
         flux_density: np.ndarray,
-        exposure_scale: float = 1.0,
+        exposure_s: float,
         vignetting=None,
     ) -> np.ndarray:
         wavelength = np.asarray(wavelength, dtype=float)
@@ -130,9 +139,19 @@ class InstrumentSimulator:
 
         d_wavelength = np.abs(np.gradient(wavelength))
 
-        # Interprets flux_density as electrons per wavelength unit before throughput,
-        # scaled by exposure_scale. For physical photon units, convert before this step.
-        bin_electrons = flux_density * throughput * d_wavelength * exposure_scale
+        wavelength_cm = wavelength * 1e-8
+        photon_energy_erg = H_ERG_S * C_CM_S / wavelength_cm
+
+        photon_flux_density = flux_density / photon_energy_erg
+
+        bin_electrons = (
+            photon_flux_density
+            * TELESCOPE_AREA_CM2
+            * d_wavelength
+            * exposure_s
+            * throughput
+        )
+
         bin_electrons = np.clip(bin_electrons, 0, None)
 
         x_centers = self.spectrograph.wavelength_to_x(wavelength)
@@ -158,7 +177,6 @@ class InstrumentSimulator:
         wavelength: np.ndarray,
         flux_density: np.ndarray,
         exposure_s: float,
-        exposure_scale: float = 1.0,
         vignetting=None,
         add_noise: bool = True,
         seed: Optional[int] = None,
@@ -166,7 +184,7 @@ class InstrumentSimulator:
         image_e = self.render_electrons(
             wavelength=wavelength,
             flux_density=flux_density,
-            exposure_scale=exposure_scale,
+            exposure_s=exposure_s,
             vignetting=vignetting,
         )
 
@@ -248,11 +266,9 @@ def f_lambda_to_photon_flux_density(
     f_lambda_erg_s_cm2_angstrom: np.ndarray,
     collecting_area_cm2: float,
 ) -> np.ndarray:
-    h_erg_s = 6.62607015e-27
-    c_cm_s = 2.99792458e10
 
     wavelength_cm = wavelength_angstrom * 1e-8
-    photon_energy_erg = h_erg_s * c_cm_s / wavelength_cm
+    photon_energy_erg = H_ERG_S * C_CM_S / wavelength_cm
 
     return (
         f_lambda_erg_s_cm2_angstrom
