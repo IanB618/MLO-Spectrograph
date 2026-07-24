@@ -46,8 +46,11 @@ class SpectrographModel:
     x_center: float
     trace_y: float
 
-    spectral_sigma_px: float = 0.7
-    spatial_sigma_px: float = 1.5
+    fiber_count: int = 1
+    fiber_pitch_px: float = 0.0
+
+    spectral_sigma_px: float = 2.03
+    spatial_sigma_px: float = 2.25
     kernel_radius_sigma: float = 4.0
 
     trace_func: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
@@ -55,11 +58,21 @@ class SpectrographModel:
     def wavelength_to_x(self, wavelength: np.ndarray) -> np.ndarray:
         return self.x_center + (wavelength - self.central_wavelength) / self.dispersion
 
-    def wavelength_to_y(self, wavelength: np.ndarray, x: np.ndarray) -> np.ndarray:
-        if self.trace_func is None:
-            return np.full_like(x, self.trace_y, dtype=float)
+    def fiber_trace_centers(self) -> np.ndarray:
+        offsets = (
+            np.arange(self.fiber_count)
+            - (self.fiber_count - 1) / 2
+        )
 
-        return self.trace_func(wavelength, x)
+        return self.trace_y + offsets * self.fiber_pitch_px
+
+    def wavelength_to_y(self, wavelength: np.ndarray, x: np.ndarray, fiber_trace_y: float = None) -> np.ndarray:
+        if fiber_trace_y is None:
+            fiber_trace_y = self.trace_y
+        if self.trace_func is None:
+            return np.full_like(x, fiber_trace_y, dtype=float)
+
+        return fiber_trace_y + self.trace_func(wavelength, x)
 
 
 @dataclass
@@ -155,19 +168,29 @@ class InstrumentSimulator:
         bin_electrons = np.clip(bin_electrons, 0, None)
 
         x_centers = self.spectrograph.wavelength_to_x(wavelength)
-        y_centers = self.spectrograph.wavelength_to_y(wavelength, x_centers)
 
         image = np.zeros((self.detector.ny, self.detector.nx), dtype=float)
 
-        self._deposit_gaussian_packets(
-            image=image,
-            x_centers=x_centers,
-            y_centers=y_centers,
-            counts=bin_electrons,
-            sigma_x=self.spectrograph.spectral_sigma_px,
-            sigma_y=self.spectrograph.spatial_sigma_px,
-            radius_sigma=self.spectrograph.kernel_radius_sigma,
-        )
+        for fiber_trace_y in (
+            self.spectrograph.fiber_trace_centers()
+        ):
+            y_centers = (
+                self.spectrograph.wavelength_to_y(
+                    wavelength,
+                    x_centers,
+                    fiber_trace_y,
+                )
+            )
+
+            self._deposit_gaussian_packets(
+                image=image,
+                x_centers=x_centers,
+                y_centers=y_centers,
+                counts=bin_electrons,
+                sigma_x=self.spectrograph.spectral_sigma_px,
+                sigma_y=self.spectrograph.spatial_sigma_px,
+                radius_sigma=self.spectrograph.kernel_radius_sigma,
+            )
 
         image = self._apply_vignetting(image, vignetting)
         return image
