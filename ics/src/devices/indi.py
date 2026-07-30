@@ -1,4 +1,6 @@
+import ctypes
 import logging
+import re
 import time
 from pathlib import Path
 from threading import Condition, Lock
@@ -46,15 +48,20 @@ class IndiClient(PyIndi.BaseClient):
             self._condition.notify_all()
         logger.info("INDI device removed: %s", device.getDeviceName())
 
-    def newProperty(self, prop):
-        self._store_blob_if_needed(prop)
-        with self._condition:
-            self._condition.notify_all()
-
-    def updateProperty(self, prop):
-        self._store_blob_if_needed(prop)
-        with self._condition:
-            self._condition.notify_all()
+    def _handle_property_update(self, prop):
+        try:
+            self._store_blob_if_needed(prop)
+        except Exception:
+            logger.exception(
+                "Could not store INDI BLOB update for %s.%s",
+                prop.getDeviceName(),
+                prop.getName(),
+            )
+        finally:
+            with self._condition:
+                self._condition.notify_all()
+    
+    newProperty = updateProperty = newBLOB = _handle_property_update
 
     def removeProperty(self, prop):
         with self._condition:
@@ -221,7 +228,8 @@ class IndiClient(PyIndi.BaseClient):
             raw_blob = widget.getBlob()
             if raw_blob is None:
                 continue
-            data = self._blob_to_bytes(raw_blob)
+            blob_len = int(widget.getBlobLen() or widget.getSize() or 0)
+            data = self._blob_to_bytes(raw_blob, blob_len)
             with self._condition:
                 self._last_blob = {
                     "device": prop.getDeviceName(),
@@ -234,7 +242,7 @@ class IndiClient(PyIndi.BaseClient):
                 }
                 self._condition.notify_all()
 
-    def _blob_to_bytes(self, raw_blob) -> bytes:
+    def _blob_to_bytes(self, raw_blob, blob_len: int) -> bytes:
         if isinstance(raw_blob, bytes):
             return raw_blob
         if isinstance(raw_blob, bytearray):
@@ -243,7 +251,29 @@ class IndiClient(PyIndi.BaseClient):
             return raw_blob.tobytes()
         if isinstance(raw_blob, str):
             return raw_blob.encode("latin1")
-        return bytes(raw_blob)
+        if blob_len <= 0:
+            raise ValueError("INDI BLOB has no byte length; cannot copy SWIG buffer")
+
+        pointer = self._swig_pointer_address(raw_blob)
+        return ctypes.string_at(pointer, blob_len)
+
+    def _swig_pointer_address(self, raw_blob) -> int:
+        try:
+            return int(raw_blob)
+        except (TypeError, ValueError):
+            pass
+
+        pointer_attr = getattr(raw_blob, "this", None)
+        if pointer_attr is not None:
+            try:
+                return int(pointer_attr)
+            except (TypeError, ValueError):
+                pass
+
+        if (match := re.search(r"0x[0-9a-fA-F]+", repr(raw_blob))) is not None:
+            return int(match.group(0), 16)
+
+        raise TypeError(f"Cannot determine pointer address for INDI BLOB object: {type(raw_blob)!r}")
 
 
 class IndiDeviceBase:
