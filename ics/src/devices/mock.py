@@ -128,7 +128,7 @@ class MockLensFocus:
 
     def status(self) -> LensStatus:
         return LensStatus(
-            name="Pinefeat EF Lens Controller",
+            name="Pinefeat CEF",
             connected=self.connected,
             ready=self.connected and not self.moving,
             state="mock",

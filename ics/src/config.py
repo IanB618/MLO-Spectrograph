@@ -16,7 +16,7 @@ class Config:
         self.indi_host = os.getenv("ICS_INDI_HOST", "127.0.0.1")
         self.indi_port = int(os.getenv("ICS_INDI_PORT", "7624"))
         self.indi_ccd_device = os.getenv("ICS_INDI_CCD_DEVICE", "FLI Kepler")
-        self.indi_focuser_device = os.getenv("ICS_INDI_FOCUSER_DEVICE", "Pinefeat Lens Controller")
+        self.indi_focuser_device = os.getenv("ICS_INDI_FOCUSER_DEVICE", "Pinefeat CEF")
         self.indi_blob_property = os.getenv("ICS_INDI_CCD_BLOB_PROPERTY", "CCD1")
         self.indi_connect_timeout_s = float(os.getenv("ICS_INDI_CONNECT_TIMEOUT_S", "10"))
         self.indi_command_timeout_s = float(os.getenv("ICS_INDI_COMMAND_TIMEOUT_S", "30"))
