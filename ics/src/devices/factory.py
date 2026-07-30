@@ -28,7 +28,7 @@ def build_device_bundle(config: Config) -> DeviceBundle:
     science_camera, lens = _build_instrument_side_devices(config)
     return DeviceBundle(
         science_camera=science_camera,
-        acquisition_camera=_build_guide_camera(config, data_root),
+        acquisition_camera=_build_guide_camera(config),
         lens=lens,
         motion=_build_stage_motion(config),
         tcs=_build_tcs(config),
@@ -62,9 +62,9 @@ def _build_instrument_side_devices(config: Config):
     raise ValueError(f"Unsupported backend mode: {config.backend_mode}")
 
 
-def _build_guide_camera(config: Config, data_root: Path):
+def _build_guide_camera(config: Config):
     if config.guide_camera_backend == "mock":
-        return MockAcquisitionCamera(data_root)
+        return MockAcquisitionCamera(config.data_root)
 
     if config.guide_camera_backend == "ace":
         return AceGuideCamera(
