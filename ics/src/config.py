@@ -11,7 +11,6 @@ class Config:
         self.host = os.getenv("ICS_HOST", "0.0.0.0")
         self.port = int(os.getenv("ICS_PORT", "5000"))
         self.data_root = Path(os.getenv("ICS_DATA_ROOT", "./data")).resolve()
-        self.backend_mode = os.getenv("ICS_BACKEND_MODE", "mock")
         self.site_name = os.getenv("ICS_SITE_NAME", "Spectrograph ICS")
         self.indi_host = os.getenv("ICS_INDI_HOST", "127.0.0.1")
         self.indi_port = int(os.getenv("ICS_INDI_PORT", "7624"))
@@ -51,7 +50,6 @@ class Config:
             "ICS_HOST": self.host,
             "ICS_PORT": self.port,
             "ICS_DATA_ROOT": self.data_root,
-            "ICS_BACKEND_MODE": self.backend_mode,
             "ICS_SITE_NAME": self.site_name,
             "ICS_INDI_HOST": self.indi_host,
             "ICS_INDI_PORT": self.indi_port,

@@ -51,7 +51,6 @@ Open `http://<instrument-host>:5000` from the LAN.
 Example `.env` settings:
 
 ```bash
-ICS_BACKEND_MODE=indi
 ICS_INDI_HOST=127.0.0.1
 ICS_INDI_PORT=7624
 ICS_INDI_CCD_DEVICE=FLI Kepler
