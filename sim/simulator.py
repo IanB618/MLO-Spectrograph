@@ -56,7 +56,7 @@ class SpectrographModel:
     trace_func: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
 
     def wavelength_to_x(self, wavelength: np.ndarray) -> np.ndarray:
-        return self.x_center + (wavelength - self.central_wavelength) / self.dispersion
+        return self.x_center - (wavelength - self.central_wavelength) / self.dispersion
 
     def fiber_trace_centers(self) -> np.ndarray:
         offsets = (

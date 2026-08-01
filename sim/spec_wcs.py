@@ -51,7 +51,7 @@ class LongSlitWCS(SlicedLowLevelWCS):
         incidence_angle_deg=32.0,
         diffraction_order=1,
         reference_pixel=None,
-        wavelength_increases_with_x=True,
+        wavelength_increases_with_x=False,
     ):
         """
         Construct a long-slit WCS from the instrument geometry.
