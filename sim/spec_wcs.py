@@ -46,7 +46,7 @@ class LongSlitWCS(SlicedLowLevelWCS):
         collimator_focal_length_mm=180.0,
         camera_focal_length_mm=100.0,
         slit_width_mm=0.105,
-        central_wavelength_nm=600.0,
+        central_wavelength_nm=626.3304,
         telescope_focal_length_mm=8125.0,
         incidence_angle_deg=32.0,
         diffraction_order=1,
