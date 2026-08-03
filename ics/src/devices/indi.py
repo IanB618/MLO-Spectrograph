@@ -135,6 +135,10 @@ class IndiClient(PyIndi.BaseClient):
         prop = self._number_property(device_name, property_name)
         return {widget.getName(): widget.getValue() for widget in prop}
 
+    def read_text(self, device_name: str, property_name: str) -> dict[str, str]:
+        prop = self._text_property(device_name, property_name)
+        return {widget.getName(): widget.getText() for widget in prop}
+
     def set_switch(self, device_name: str, property_name: str, on_name: str):
         prop = self._switch_property(device_name, property_name)
         if hasattr(prop, "reset"):
@@ -198,6 +202,13 @@ class IndiClient(PyIndi.BaseClient):
         prop = PyIndi.PropertySwitch(generic)
         if not prop.isValid():
             raise TypeError(f"{device_name}.{property_name} is not an INDI switch property")
+        return prop
+
+    def _text_property(self, device_name: str, property_name: str):
+        generic = self.wait_for_property(device_name, property_name, timeout_s=1.0)
+        prop = PyIndi.PropertyText(generic)
+        if not prop.isValid():
+            raise TypeError(f"{device_name}.{property_name} is not an INDI text property")
         return prop
 
     def _set_widgets_by_name_or_first(self, prop, values: dict[str, float], setter_name: str):
@@ -349,18 +360,21 @@ class IndiCcdCamera(IndiDeviceBase):
         self.exposing = False
         self.last_result: ExposureResult | None = None
         self._temperature_setpoint_c: float | None = None
+        self._published_name = device_name
         self._abort_requested = Event()
 
     def connect(self):
         super().connect()
         client = self._require_client()
         client.request_blobs(self.device_name, self.blob_property)
+        self._refresh_published_name()
 
     def status(self) -> CameraStatus:
         if not self.connected:
-            return CameraStatus(name=self.device_name, connected=False, ready=False, state="offline")
+            return CameraStatus(name=self._published_name, connected=False, ready=False, state="offline")
 
         client = self._require_client()
+        self._refresh_published_name()
         temperature = self._read_first_number("CCD_TEMPERATURE")
         cooler_power = self._read_first_number("CCD_COOLER_POWER")
         roi = self._read_roi()
@@ -368,7 +382,7 @@ class IndiCcdCamera(IndiDeviceBase):
         state = client.property_state(self.device_name, "CCD_EXPOSURE")
         exposing = self.exposing or state == "busy"
         return CameraStatus(
-            name=self.device_name,
+            name=self._published_name,
             connected=True,
             ready=not exposing,
             state=state,
@@ -385,6 +399,20 @@ class IndiCcdCamera(IndiDeviceBase):
         client = self._require_client()
         client.set_number(self.device_name, "CCD_TEMPERATURE", {"CCD_TEMPERATURE_VALUE": setpoint_c})
         self._temperature_setpoint_c = setpoint_c
+
+    def _refresh_published_name(self):
+        client = self._require_client()
+        if client.get_property(self.device_name, "CCD_PRODUCT") is None:
+            return
+        try:
+            values = client.read_text(self.device_name, "CCD_PRODUCT")
+        except (TimeoutError, TypeError):
+            logger.warning("Could not read %s.CCD_PRODUCT as an INDI text property", self.device_name)
+            return
+
+        published_name = values.get("NAME", "").strip()
+        if published_name:
+            self._published_name = published_name
 
     def expose(self, request: ExposureRequest) -> ExposureResult:
         client = self._require_client()

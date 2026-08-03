@@ -295,6 +295,9 @@ function updateStatus(status) {
   setText("system-message", status.message || "--");
 
   const science = status.science_camera;
+  const scienceName = science.name || "Science camera";
+  setText("science-camera-label", scienceName);
+  setText("science-camera-title", `Science Camera / ${scienceName}`);
   setBadge("science-state-badge", deviceStateBadge(science));
   setText("science-summary", `${formatNumber(science.temperature_c, 1, " C")} / ${formatNumber(science.setpoint_c, 1, " C")}`);
   setText("science-note", `Cooler ${formatNumber(science.cooler_power_pct, 0, "%")}; ${science.exposing ? "exposing" : "not exposing"}`);
@@ -335,6 +338,7 @@ function updateStatus(status) {
     ["Tracking / Guiding", `${formatBool(tcs.tracking)} / ${formatBool(tcs.guiding)}`],
   ]);
   renderKeyGrid("science-camera-status", [
+    ["Camera", scienceName],
     ["Connection", science.connected ? "Connected" : "Offline"],
     ["Temperature", formatNumber(science.temperature_c, 2, " C")],
     ["Setpoint", formatNumber(science.setpoint_c, 2, " C")],

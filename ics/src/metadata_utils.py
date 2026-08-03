@@ -47,7 +47,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("LATITUDE", round(MLO.lat.deg, 3), "[deg] Location latitude", after="LOCATION")
         f[0].header.set("LONGITUD", round(MLO.lon.deg, 3), "[deg] Location longitude", after="LATITUDE")
         f[0].header.set("TELESCOP", "Claud 1.25-m Telescope", "Telescope name", after="LONGITUD")
-        camera = f[0].header.get("INSTRUME", None)
+        camera = system_status.science_camera.name or f[0].header.get("INSTRUME", None)
         f[0].header.set("INSTRUME", "Fiber-Fed Spectrograph", "Instrument name", after="TELESCOP")
         f[0].header.set("CAMERA", camera, "Camera name (from INDI)", after="INSTRUME")
         f[0].header.set("FILTER", "ThorLabs FGL400S", "Filter in use", after="CAMERA") # TODO: make configurable
