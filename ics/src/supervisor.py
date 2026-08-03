@@ -114,12 +114,43 @@ class InstrumentSupervisor:
                     raise RuntimeError(f"Cannot expose while state is {self.state}")
 
             self._set_status(SystemState.EXPOSING, f"Taking {request.image_type} exposure")
+            result: ExposureResult | None = None
             try:
                 result = self.devices.science_camera.expose(request)
                 with self._state_lock:
                     self.last_exposure = result
                 self._set_status(SystemState.IDLE, result.message)
-                self.data_manager.process_exposure(request, result, self.snapshot())
+
+                log_snapshot: SystemSnapshot | None = None
+                try:
+                    log_snapshot = self.snapshot()
+                    self.data_manager.process_exposure(request, result, log_snapshot)
+                except Exception as exc:
+                    result.success = False
+                    result.message = f"FITS saved, but exposure post-processing failed: {exc}"
+                    with self._state_lock:
+                        self.last_exposure = result
+                    self._set_status(SystemState.ERROR, result.message)
+                    if log_snapshot is not None:
+                        log_snapshot = log_snapshot.model_copy(
+                            update={
+                                "state": SystemState.ERROR,
+                                "message": result.message,
+                                "last_exposure": result,
+                            }
+                        )
+                    raise
+                finally:
+                    if result.path.exists():
+                        if log_snapshot is None:
+                            try:
+                                log_snapshot = self.snapshot()
+                            except Exception:
+                                logger.exception("Could not capture a system snapshot for exposure log")
+                        if log_snapshot is not None:
+                            log_snapshot = log_snapshot.model_copy(update={"last_exposure": result})
+                        self.data_manager.log_exposure(request, result, log_snapshot)
+
                 return result
             except ExposureAbortedError:
                 logger.info("Exposure aborted")
@@ -127,7 +158,15 @@ class InstrumentSupervisor:
                 raise
             except Exception:
                 logger.exception("Exposure failed")
-                self._set_status(SystemState.ERROR, "Exposure failed")
+                if result is not None and result.path.exists():
+                    if result.success:
+                        result.success = False
+                        result.message = "FITS saved, but exposure finalization failed"
+                        with self._state_lock:
+                            self.last_exposure = result
+                    self._set_status(SystemState.ERROR, result.message)
+                else:
+                    self._set_status(SystemState.ERROR, "Exposure failed")
                 raise
 
     def abort_exposure(self):
@@ -138,7 +177,9 @@ class InstrumentSupervisor:
             self._set_status(message="No exposure is currently in progress")
             return
 
-        self.devices.science_camera.abort() # deliberately bypass _operation_lock since take_exposure holds it
+        # Deliberately bypass _operation_lock: take_exposure holds it while waiting
+        # for the camera, and abort must remain callable from another request.
+        self.devices.science_camera.abort()
         self._set_status(message="Exposure abort requested")
 
     def run_focus_sweep_placeholder(self):

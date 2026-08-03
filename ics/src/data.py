@@ -14,11 +14,13 @@ class DataManager:
 
     def process_exposure(self, request: ExposureRequest, result: ExposureResult, snapshot: SystemSnapshot):
         update_fits_metadata(request, snapshot)
+
+    def log_exposure(self, request: ExposureRequest, result: ExposureResult, snapshot: SystemSnapshot | None):
         entry = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "request": request.model_dump(mode="json"),
             "result": result.model_dump(mode="json"),
-            "snapshot": snapshot.model_dump(mode="json"),
+            "snapshot": snapshot.model_dump(mode="json") if snapshot is not None else None,
         }
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
