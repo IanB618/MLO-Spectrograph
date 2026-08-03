@@ -33,7 +33,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
     with fits.open(filepath, mode="update") as f:
         orig_header = f[0].header.copy()
-        for kw in ["COMMENT", "ROWORDER"]:
+        for kw in ["COMMENT", "ROWORDER", "FOCUSTEM"]:
             try:
                 _ = f[0].header.pop(kw)
             except KeyError:
@@ -53,8 +53,9 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("GRATING", "Newport 270R", "ID of grating in use", after="FILTER") # TODO
 
         f[0].header.set("OBJECT", request.object_name, "Target name", after="CAMERA")
-        f[0].header.set("RA", tcs_status.ra, "Nominal right ascension", after="OBJECT")
-        f[0].header.set("DEC", tcs_status.dec, "Nominal declination", after="RA")
+        f[0].header.set("RA", tcs_status.ra, "[deg] Nominal right ascension", after="OBJECT")
+        f[0].header.set("DEC", tcs_status.dec, "[deg] Nominal declination", after="RA")
+        f[0].header.set("AIRMASS", tcs_status.airmass, "Airmass at end of observation", after="DEC")
         for axis in stages:
             f[0].header.set(axis.name.replace("_", "").upper().replace("FOCUS", "Z"), axis.position,
                             f"{axis.name.split('_')[1].capitalize()} stage position")
@@ -66,4 +67,5 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
+        f[0].header.set("TECPOWER", system_status.science_camera.cooler_power_pct, "[%] Thermoelectric cooler power", after="CCD-TEMP")
         f[0].header.set("DATE", Time.now().isot, "Time HDU was created/modified")
