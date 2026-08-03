@@ -143,8 +143,8 @@ class AceTcs:
             state="connected",
             message=self.last_message,
             target_name=target_name,
-            ra=self._format_degrees(current_ra),
-            dec=self._format_degrees(current_dec),
+            ra=current_ra,
+            dec=current_dec,
             tracking=True,
             guiding=False,
         )
@@ -206,11 +206,6 @@ class AceTcs:
         if position is None:
             return None
         return _safe_float(getattr(position, name, None))
-
-    def _format_degrees(self, value: float | None) -> str | None:
-        if value is None:
-            return None
-        return f"{value:.6f} deg"
 
     def _validate_ra_dec(self, ra_deg: float, dec_deg: float):
         if not 0.0 <= float(ra_deg) < 360.0:
