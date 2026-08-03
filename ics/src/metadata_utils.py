@@ -7,7 +7,7 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.coordinates import EarthLocation, SkyCoord
 
-from .models import ExposureResult, SystemSnapshot
+from .models import ExposureRequest, SystemSnapshot
 
 MLO = EarthLocation.of_site("Mount Laguna Observatory")
 
@@ -15,18 +15,19 @@ def get_cpu_temp():
     cmd = ["sensors", "-j"]
     p = subprocess.run(cmd, text=True, capture_output=True)
     if p.returncode:
-        return float("nan")
+        return None
     try:
         result = json.loads(p.stdout)
         temp_c = result["cpu_thermal-virtual-0"]["temp1"]["temp1_input"]
         return temp_c
     except (KeyError, json.JSONDecodeError):
-        return float("nan")
+        return None
 
 def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot):
     filepath = system_status.last_exposure.path
     exp_result = system_status.last_exposure
     tcs_status = system_status.tcs
+    stages = system_status.axes
     if not filepath.exists():
         raise FileNotFoundError(filepath.as_posix())
 
@@ -48,10 +49,20 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         camera = f[0].header.get("INSTRUME", None)
         f[0].header.set("INSTRUME", "Fiber-Fed Spectrograph", "Instrument name", after="TELESCOP")
         f[0].header.set("CAMERA", camera, "Camera name", after="INSTRUME")
+        f[0].header.set("FILTER", "ThorLabs FGL400S", "ID of filter in use", after="CAMERA") # TODO
+        f[0].header.set("GRATING", "Newport 270R", "ID of grating in use", after="FILTER") # TODO
 
         f[0].header.set("OBJECT", request.object_name, "Target name", after="CAMERA")
         f[0].header.set("RA", tcs_status.ra, "Nominal right ascension", after="OBJECT")
         f[0].header.set("DEC", tcs_status.dec, "Nominal declination", after="RA")
+        for axis in stages:
+            f[0].header.set(axis.name.replace("_", "").upper().replace("FOCUS", "Z"), axis.position,
+                            f"{axis.name.split('_')[1].capitalize()} stage position")
+        f[0].header.set("STAGEX", after="DEC")
+        f[0].header.set("STAGEY", after="STAGEX")
+        f[0].header.set("STAGEZ", after="STAGEY")
+        f[0].header.rename_keyword("FOCUSPOS", "CAMFOCUS")
+        f[0].header.set("TELFOCUS", None, "Telescope focus position", before="CAMFOCUS") # TODO: tcs_status.focus_position
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
