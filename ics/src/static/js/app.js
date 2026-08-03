@@ -387,12 +387,6 @@ document.addEventListener("click", (event) => {
   if (action === "disconnect") {
     runAndRefresh(() => api("/api/disconnect", {method: "POST"}));
   }
-  if (action === "safe") {
-    runAndRefresh(() => api("/api/safe", {method: "POST", body: JSON.stringify({message: "Manual safe mode from UI"})}));
-  }
-  if (action === "clear-safe") {
-    runAndRefresh(() => api("/api/safe/clear", {method: "POST"}));
-  }
   if (action === "abort-exposure") {
     runAndRefresh(() => api("/api/science-camera/abort", {method: "POST"}));
   }

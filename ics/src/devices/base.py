@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from src.models import CameraStatus, ExposureRequest, ExposureResult, LensStatus, TcsStatus, AxisStatus
 
 
+class ExposureAbortedError(RuntimeError):
+    """Raised when an active science-camera exposure is cancelled."""
+
+
 class DeviceBackend(ABC):
     @abstractmethod
     def connect(self):

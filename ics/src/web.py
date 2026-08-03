@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 from src.config import Config
 from src.data import DataManager
 from src.devices import build_device_bundle
+from src.devices.base import ExposureAbortedError
 from src.logging_config import configure_logging
 from src.models import ExposureRequest, LensMoveRequest, MotionMoveRequest, TcsGotoRequest
 from src.supervisor import InstrumentSupervisor
@@ -61,6 +62,10 @@ def create_app():
     def handle_key_error(error):
         return _json_error(error, 400, "Missing request field", message=f"Missing required field: {error}")
 
+    @app.errorhandler(ExposureAbortedError)
+    def handle_exposure_aborted(error):
+        return _json_error(error, 409, "Exposure aborted", message="The science-camera exposure was aborted.")
+
     @app.errorhandler(RuntimeError)
     def handle_runtime_error(error):
         return _json_error(error, 409, "Runtime error")
@@ -104,17 +109,6 @@ def create_app():
     @app.post("/api/disconnect")
     def api_disconnect():
         supervisor.disconnect_all()
-        return jsonify(supervisor.snapshot().model_dump(mode="json"))
-
-    @app.post("/api/safe")
-    def api_safe():
-        payload = request.get_json(silent=True) or {}
-        supervisor.set_safe(payload.get("message", "Manual safe mode"))
-        return jsonify(supervisor.snapshot().model_dump(mode="json"))
-
-    @app.post("/api/safe/clear")
-    def api_clear_safe():
-        supervisor.clear_safe()
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
     @app.post("/api/science-camera/temperature")

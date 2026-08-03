@@ -3,9 +3,10 @@ import logging
 import re
 import time
 from pathlib import Path
-from threading import Condition, Lock
+from threading import Condition, Event, Lock
 from uuid import uuid4
 
+from src.devices.base import ExposureAbortedError
 from src.models import CameraStatus, ExposureRequest, ExposureResult, LensStatus
 
 import PyIndi
@@ -201,10 +202,12 @@ class IndiClient(PyIndi.BaseClient):
         with self._condition:
             self._last_blob = None
 
-    def wait_for_blob(self, device_name: str, property_name: str, timeout_s: float):
+    def wait_for_blob(self, device_name: str, property_name: str, timeout_s: float, cancel_event: Event | None = None):
         deadline = time.monotonic() + timeout_s
         with self._condition:
             while time.monotonic() < deadline:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise ExposureAbortedError(f"Exposure aborted while waiting for {device_name}.{property_name}")
                 if (
                     self._last_blob is not None
                     and self._last_blob["device"] == device_name
@@ -394,6 +397,7 @@ class IndiCcdCamera(IndiDeviceBase):
         self.binning = (1, 1)
         self.exposing = False
         self.last_result: ExposureResult | None = None
+        self._abort_requested = Event()
 
     def connect(self):
         super().connect()
@@ -439,6 +443,7 @@ class IndiCcdCamera(IndiDeviceBase):
 
     def expose(self, request: ExposureRequest) -> ExposureResult:
         client = self._require_client()
+        self._abort_requested.clear()
         self.exposing = True
         self.binning = request.binning_tuple
         exposure_id = f"{time.strftime('%Y%m%dT%H%M%S')}_{request.image_type}_{uuid4().hex[:8]}"
@@ -455,7 +460,9 @@ class IndiCcdCamera(IndiDeviceBase):
             client.clear_last_blob()
             client.request_blobs(self.device_name, self.blob_property)
             client.set_number(self.device_name, "CCD_EXPOSURE", {"CCD_EXPOSURE_VALUE": request.exposure_s})
-            blob = client.wait_for_blob(self.device_name, self.blob_property, request.exposure_s + self.command_timeout_s)
+            blob = client.wait_for_blob(self.device_name, self.blob_property,
+                                        request.exposure_s + self.command_timeout_s,
+                                        cancel_event=self._abort_requested)
             path.write_bytes(blob["data"])
             result = ExposureResult(
                 exposure_id=exposure_id,
@@ -472,14 +479,15 @@ class IndiCcdCamera(IndiDeviceBase):
 
     def abort(self):
         if not self.connected:
-            self.exposing = False
+            self._abort_requested.set()
             return
         client = self._require_client()
         try:
             client.set_switch(self.device_name, "CCD_ABORT_EXPOSURE", "ABORT")
         except Exception:
             logger.exception("Could not send CCD abort command")
-        self.exposing = False
+            raise
+        self._abort_requested.set()
 
     def _set_frame_type(self, request: ExposureRequest):
         frame_map = {

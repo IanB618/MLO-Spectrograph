@@ -307,7 +307,6 @@ code {
   border-color: rgb(200 151 55 / 0.55);
 }
 
-.badge-safe,
 .badge-error,
 .badge-offline {
   background: rgb(173 52 52 / 0.18);
