@@ -381,6 +381,31 @@ async function runAndRefresh(task) {
   }
 }
 
+function bindSubmit(formId, handler) {
+  const form = document.getElementById(formId);
+  if (!form) {
+    console.warn(`Skipping submit handler for missing form #${formId}`);
+    return;
+  }
+  form.addEventListener("submit", handler);
+}
+
+async function initializePage() {
+  try {
+    await Promise.all([refreshStatus(), refreshLog()]);
+  } catch (error) {
+    setBadge("system-state-badge", stateBadge("error"));
+    setText("system-message", error.message || "Initial status request failed");
+    showError(error);
+  }
+}
+
+function poll(task) {
+  task().catch((error) => {
+    console.error("Periodic refresh failed", error);
+  });
+}
+
 document.addEventListener("click", (event) => {
   const action = event.target.dataset.action;
   if (!action) {
@@ -415,13 +440,13 @@ document.addEventListener("click", (event) => {
   }
 });
 
-document.getElementById("temperature-form").addEventListener("submit", (event) => {
+bindSubmit("temperature-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["setpoint_c"]);
   runAndRefresh(() => api("/api/science-camera/temperature", {method: "POST", body: JSON.stringify(payload)}));
 });
 
-document.getElementById("exposure-form").addEventListener("submit", (event) => {
+bindSubmit("exposure-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
@@ -435,7 +460,7 @@ document.getElementById("exposure-form").addEventListener("submit", (event) => {
   });
 });
 
-document.getElementById("acq-preview-form").addEventListener("submit", (event) => {
+bindSubmit("acq-preview-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
@@ -444,13 +469,13 @@ document.getElementById("acq-preview-form").addEventListener("submit", (event) =
   });
 });
 
-document.getElementById("motion-form").addEventListener("submit", (event) => {
+bindSubmit("motion-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["position", "delta"]);
   runAndRefresh(() => api("/api/motion/move", {method: "POST", body: JSON.stringify(payload)}));
 });
 
-document.getElementById("lens-form").addEventListener("submit", (event) => {
+bindSubmit("lens-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["position", "delta"]);
   runAndRefresh(async () => {
@@ -464,7 +489,7 @@ document.getElementById("lens-form").addEventListener("submit", (event) => {
   });
 });
 
-document.getElementById("lens-aperture-absolute-form").addEventListener("submit", (event) => {
+bindSubmit("lens-aperture-absolute-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["f_stop"]);
   runAndRefresh(async () => {
@@ -476,7 +501,7 @@ document.getElementById("lens-aperture-absolute-form").addEventListener("submit"
   });
 });
 
-document.getElementById("lens-aperture-relative-form").addEventListener("submit", (event) => {
+bindSubmit("lens-aperture-relative-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["delta"]);
   runAndRefresh(async () => {
@@ -488,7 +513,7 @@ document.getElementById("lens-aperture-relative-form").addEventListener("submit"
   });
 });
 
-document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {
+bindSubmit("tcs-goto-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["ra_deg", "dec_deg"]);
   runAndRefresh(async () => {
@@ -501,7 +526,7 @@ document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {
   });
 });
 
-document.getElementById("tcs-offset-form").addEventListener("submit", (event) => {
+bindSubmit("tcs-offset-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["east_arcsec", "north_arcsec"]);
   runAndRefresh(async () => {
@@ -516,7 +541,6 @@ document.getElementById("tcs-offset-form").addEventListener("submit", (event) =>
   });
 });
 
-refreshStatus();
-refreshLog();
-setInterval(refreshStatus, 2000);
-setInterval(refreshLog, 10000);
+initializePage();
+setInterval(() => poll(refreshStatus), 2000);
+setInterval(() => poll(refreshLog), 10000);
