@@ -25,7 +25,7 @@
 </section>
 
 <section class="grid">
-  <article class="card span-2">
+  <article class="card">
     <div class="card-header">
       <div>
         <h2>System</h2>
@@ -92,6 +92,7 @@
         <button type="button" class="secondary" data-action="abort-exposure">Abort exposure</button>
       </div>
     </form>
+    <div id="science-camera-output" class="result-box muted">No science exposure completed yet.</div>
   </article>
 
   <article class="card">
@@ -151,17 +152,7 @@
         <button type="button" class="secondary" data-action="focus-sweep">Focus sweep placeholder</button>
       </div>
     </form>
-  </article>
-
-  <article class="card">
-    <div class="card-header">
-      <div>
-        <h2>Calibration</h2>
-        <p>Stub for bias, dark, flat, and arc sequences.</p>
-      </div>
-    </div>
-    <button data-action="run-calibration">Run calibration placeholder</button>
-    <div id="calibration-output" class="result-box muted">No calibration action yet.</div>
+    <div id="lens-output" class="result-box muted">No lens focus action yet.</div>
   </article>
 
   <article class="card span-2">

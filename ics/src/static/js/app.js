@@ -398,19 +398,13 @@ document.addEventListener("click", (event) => {
   if (action === "focus-sweep") {
     runAndRefresh(async () => {
       const result = await api("/api/lens/focus-sweep", {method: "POST"});
-      renderResult("calibration-output", "Focus sweep result", {"Best position": result.best_position});
+      renderResult("lens-output", "Focus sweep result", {"Best position": result.best_position});
     });
   }
   if (action === "center-target") {
     runAndRefresh(async () => {
       const result = await api("/api/acquisition/center", {method: "POST"});
       renderResult("acq-output", "Centering result", {"Delta east": `${result.dx_arcsec} arcsec`, "Delta north": `${result.dy_arcsec} arcsec`});
-    });
-  }
-  if (action === "run-calibration") {
-    runAndRefresh(async () => {
-      const result = await api("/api/calibration/run", {method: "POST"});
-      renderResult("calibration-output", "Calibration result", {"Frames produced": result.frames.length});
     });
   }
 });
@@ -426,7 +420,7 @@ document.getElementById("exposure-form").addEventListener("submit", (event) => {
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
     const result = await api("/api/science-camera/expose", {method: "POST", body: JSON.stringify(payload)});
-    renderResult("calibration-output", "Exposure complete", {
+    renderResult("science-camera-output", "Exposure complete", {
       "Exposure ID": result.exposure_id,
       "Image type": result.image_type,
       "Exposure": `${result.exposure_s} s`,
