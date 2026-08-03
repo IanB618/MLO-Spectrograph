@@ -62,6 +62,10 @@ class LensFocusBackend(DeviceBackend):
     def stop(self):
         raise NotImplementedError
 
+    @abstractmethod
+    def calibrate(self):
+        raise NotImplementedError
+
 
 class MotionBackend(DeviceBackend):
     @abstractmethod

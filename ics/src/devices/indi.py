@@ -514,6 +514,10 @@ class IndiFocuser(IndiDeviceBase):
         except Exception:
             logger.exception("Could not send focuser abort command")
 
+    def calibrate(self):
+        client = self._require_client()
+        client.set_switch(self.device_name, "CALIBRATE", "CALIBRATE")
+
     def _read_position(self) -> int:
         client = self._require_client()
         if client.get_property(self.device_name, "ABS_FOCUS_POSITION") is None:
