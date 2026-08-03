@@ -105,19 +105,40 @@ function formatTuple(value) {
   return value.join(" x ");
 }
 
-function stateBadge(value) {
-  const state = value || "unknown";
-  return `<span class="badge badge-${escapeHtml(state)}">${escapeHtml(state.toUpperCase())}</span>`;
+function badgeTone(value) {
+  const state = String(value || "unknown").toLowerCase();
+  if (["ready", "idle", "ok", "connected", "mock"].includes(state)) {
+    return "ready";
+  }
+  if (["busy", "moving", "slewing", "tracking", "acquiring", "focusing", "exposing", "calibrating"].includes(state)) {
+    return "busy";
+  }
+  if (["error", "alert", "fault", "failed"].includes(state)) {
+    return "error";
+  }
+  if (["offline", "disconnected"].includes(state)) {
+    return "offline";
+  }
+  return "unknown";
 }
 
-function connectionBadge(device) {
+function stateBadge(value) {
+  const state = String(value || "unknown").toLowerCase();
+  return `<span class="badge badge-${badgeTone(state)}">${escapeHtml(state.toUpperCase())}</span>`;
+}
+
+function deviceStateBadge(device) {
   if (!device || !device.connected) {
-    return '<span class="badge badge-offline">OFFLINE</span>';
+    return stateBadge("offline");
   }
-  if (device.ready) {
-    return '<span class="badge badge-ready">READY</span>';
+  return stateBadge(device.state || (device.ready ? "ready" : "busy"));
+}
+
+function setBadge(id, html) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.outerHTML = html.replace("<span", `<span id="${id}"`);
   }
-  return '<span class="badge badge-busy">BUSY</span>';
 }
 
 function escapeHtml(value) {
@@ -186,32 +207,6 @@ function renderKeyGrid(targetId, rows) {
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
-}
-
-function renderDeviceTable(status) {
-  const devices = [
-    ["Science camera", status.science_camera],
-    ["Guide camera / acquisition", status.acquisition_camera],
-    ["Lens controller", status.lens],
-    ["ACE TCS", status.tcs],
-  ];
-  document.getElementById("device-table").innerHTML = `
-    <table>
-      <thead>
-        <tr><th>Subsystem</th><th>Status</th><th>Backend state</th><th>Message</th></tr>
-      </thead>
-      <tbody>
-        ${devices.map(([label, device]) => `
-          <tr>
-            <td>${escapeHtml(label)}</td>
-            <td>${connectionBadge(device)}</td>
-            <td>${escapeHtml(device.state || "--")}</td>
-            <td>${escapeHtml(device.message || "--")}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
 }
 
 function renderAxisTable(axes) {
@@ -296,16 +291,32 @@ function renderResult(targetId, title, rows) {
 }
 
 function updateStatus(status) {
-  document.getElementById("system-state-badge").outerHTML = stateBadge(status.state).replace("<span", '<span id="system-state-badge"');
+  setBadge("system-state-badge", stateBadge(status.state));
   setText("system-message", status.message || "--");
 
   const science = status.science_camera;
+  setBadge("science-state-badge", deviceStateBadge(science));
   setText("science-summary", `${formatNumber(science.temperature_c, 1, " C")} / ${formatNumber(science.setpoint_c, 1, " C")}`);
-  setText("science-note", `${science.connected ? "Connected" : "Offline"}; cooler ${formatNumber(science.cooler_power_pct, 0, "%")}`);
+  setText("science-note", `Cooler ${formatNumber(science.cooler_power_pct, 0, "%")}; ${science.exposing ? "exposing" : "not exposing"}`);
+  setText("science-message", science.message || (science.connected ? "Connected" : "Offline"));
 
   const tcs = status.tcs;
+  setBadge("tcs-state-badge", deviceStateBadge(tcs));
   setText("tcs-summary", tcs.target_name || "No target");
   setText("tcs-note", `${tcs.tracking ? "Tracking" : "Not tracking"}; ${tcs.guiding ? "guiding" : "not guiding"}`);
+  setText("tcs-message", tcs.message || (tcs.connected ? "Connected" : "Offline"));
+
+  const acquisition = status.acquisition_camera;
+  setBadge("acquisition-state-badge", deviceStateBadge(acquisition));
+  setText("acquisition-summary", acquisition.exposing ? "Exposure in progress" : (acquisition.ready ? "Ready" : "Unavailable"));
+  setText("acquisition-note", `${formatNumber(acquisition.temperature_c, 1, " C")}; ${acquisition.gain_mode || "readout mode unavailable"}`);
+  setText("acquisition-message", acquisition.message || (acquisition.connected ? "Connected" : "Offline"));
+
+  const lens = status.lens;
+  setBadge("lens-state-badge", deviceStateBadge(lens));
+  setText("lens-summary", `Position ${lens.position ?? "--"}`);
+  setText("lens-note", lens.moving ? "Moving" : "Stationary");
+  setText("lens-message", lens.message || (lens.connected ? "Connected" : "Offline"));
 
   if (status.last_exposure) {
     setText("last-exposure-summary", `${status.last_exposure.image_type} ${formatNumber(status.last_exposure.exposure_s, 1, " s")}`);
@@ -315,7 +326,6 @@ function updateStatus(status) {
     setText("last-exposure-note", "No science exposure recorded.");
   }
 
-  renderDeviceTable(status);
   renderKeyGrid("tcs-status", [
     ["Connection", tcs.connected ? "Connected" : "Offline"],
     ["Target", tcs.target_name || "--"],
