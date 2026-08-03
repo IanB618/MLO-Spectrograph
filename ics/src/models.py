@@ -14,7 +14,6 @@ class SystemState(StrEnum):
     FOCUSING = "focusing"
     EXPOSING = "exposing"
     CALIBRATING = "calibrating"
-    SAFE = "safe"
     ERROR = "error"
 
 
