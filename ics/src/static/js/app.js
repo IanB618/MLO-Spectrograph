@@ -411,6 +411,14 @@ document.addEventListener("click", (event) => {
       renderResult("lens-output", "Focus sweep result", {"Best position": result.best_position});
     });
   }
+  if (action === "calibrate-lens") {
+    runAndRefresh(async () => {
+      await api("/api/lens/calibrate", {method: "POST"});
+      renderResult("lens-output", "Lens calibration started", {
+        "INDI property": "CALIBRATE.CALIBRATE",
+      });
+    });
+  }
   if (action === "center-target") {
     runAndRefresh(async () => {
       const result = await api("/api/acquisition/center", {method: "POST"});

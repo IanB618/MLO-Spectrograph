@@ -160,6 +160,11 @@ def create_app():
     def api_lens_focus_sweep():
         return jsonify(supervisor.run_focus_sweep_placeholder())
 
+    @app.post("/api/lens/calibrate")
+    def api_lens_calibrate():
+        supervisor.calibrate_lens()
+        return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
     @app.post("/api/tcs/goto-j2000")
     def api_tcs_goto_j2000():
         request_model = TcsGotoRequest(**request.get_json())

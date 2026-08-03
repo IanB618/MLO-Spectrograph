@@ -97,6 +97,12 @@ class InstrumentSupervisor:
                 raise ValueError("Lens request requires position or delta")
             self._set_status(SystemState.IDLE, "Lens focus moved")
 
+    def calibrate_lens(self):
+        with self._operation_lock:
+            self._set_status(SystemState.FOCUSING, "Starting lens calibration")
+            self.devices.lens.calibrate()
+            self._set_status(SystemState.IDLE, "Lens calibration started")
+
     def tcs_go_to_j2000(self, request: TcsGotoRequest):
         result = self.devices.tcs.go_to_j2000(request.ra_deg, request.dec_deg)
         self._set_status(message="TCS J2000 slew requested")
