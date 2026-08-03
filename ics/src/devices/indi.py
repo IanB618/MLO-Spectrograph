@@ -7,7 +7,6 @@ from threading import Condition, Lock
 from uuid import uuid4
 
 from src.models import CameraStatus, ExposureRequest, ExposureResult, LensStatus
-from src.metadata_utils import update_fits_metadata
 
 import PyIndi
 
@@ -458,7 +457,6 @@ class IndiCcdCamera(IndiDeviceBase):
             client.set_number(self.device_name, "CCD_EXPOSURE", {"CCD_EXPOSURE_VALUE": request.exposure_s})
             blob = client.wait_for_blob(self.device_name, self.blob_property, request.exposure_s + self.command_timeout_s)
             path.write_bytes(blob["data"])
-            update_fits_metadata(path, request)
             result = ExposureResult(
                 exposure_id=exposure_id,
                 image_type=request.image_type,

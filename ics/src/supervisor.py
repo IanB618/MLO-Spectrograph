@@ -122,7 +122,7 @@ class InstrumentSupervisor:
                 self.last_exposure = result
                 self.state = SystemState.IDLE
                 self.message = result.message
-                self.data_manager.record_exposure(request, result, self.snapshot())
+                self.data_manager.process_exposure(request, result, self.snapshot())
                 return result
             except Exception:
                 logger.exception("Exposure failed")
