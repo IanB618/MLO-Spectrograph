@@ -19,10 +19,6 @@ class Config:
         self.indi_blob_property = os.getenv("ICS_INDI_CCD_BLOB_PROPERTY", "CCD1")
         self.indi_connect_timeout_s = float(os.getenv("ICS_INDI_CONNECT_TIMEOUT_S", "10"))
         self.indi_command_timeout_s = float(os.getenv("ICS_INDI_COMMAND_TIMEOUT_S", "30"))
-        self.indi_telescope_aperture_mm = self._optional_float("ICS_INDI_TELESCOPE_APERTURE_MM")
-        self.indi_telescope_focal_length_mm = self._optional_float("ICS_INDI_TELESCOPE_FOCAL_LENGTH_MM")
-        self.indi_guider_aperture_mm = self._optional_float("ICS_INDI_GUIDER_APERTURE_MM")
-        self.indi_guider_focal_length_mm = self._optional_float("ICS_INDI_GUIDER_FOCAL_LENGTH_MM")
         self.tcs_backend = os.getenv("ICS_TCS_BACKEND", "mock")
         self.guide_camera_backend = os.getenv("ICS_GUIDE_CAMERA_BACKEND", "mock")
         self.stage_backend = os.getenv("ICS_STAGE_BACKEND", "mock")
@@ -58,10 +54,6 @@ class Config:
             "ICS_INDI_CCD_BLOB_PROPERTY": self.indi_blob_property,
             "ICS_INDI_CONNECT_TIMEOUT_S": self.indi_connect_timeout_s,
             "ICS_INDI_COMMAND_TIMEOUT_S": self.indi_command_timeout_s,
-            "ICS_INDI_TELESCOPE_APERTURE_MM": self.indi_telescope_aperture_mm,
-            "ICS_INDI_TELESCOPE_FOCAL_LENGTH_MM": self.indi_telescope_focal_length_mm,
-            "ICS_INDI_GUIDER_APERTURE_MM": self.indi_guider_aperture_mm,
-            "ICS_INDI_GUIDER_FOCAL_LENGTH_MM": self.indi_guider_focal_length_mm,
             "ICS_TCS_BACKEND": self.tcs_backend,
             "ICS_GUIDE_CAMERA_BACKEND": self.guide_camera_backend,
             "ICS_STAGE_BACKEND": self.stage_backend,

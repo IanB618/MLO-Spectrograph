@@ -43,10 +43,6 @@ def _build_instrument_side_devices(config: Config):
             blob_property=config.indi_blob_property,
             connect_timeout_s=config.indi_connect_timeout_s,
             command_timeout_s=config.indi_command_timeout_s,
-            telescope_aperture_mm=config.indi_telescope_aperture_mm,
-            telescope_focal_length_mm=config.indi_telescope_focal_length_mm,
-            guider_aperture_mm=config.indi_guider_aperture_mm,
-            guider_focal_length_mm=config.indi_guider_focal_length_mm,
         ),
         IndiFocuser(
             host=config.indi_host,
