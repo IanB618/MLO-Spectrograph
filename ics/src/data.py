@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 
 from src.models import ExposureRequest, ExposureResult, SystemSnapshot
+from src.metadata_utils import update_fits_metadata
 
 
 class DataManager:
@@ -11,7 +12,8 @@ class DataManager:
         self.log_path = self.data_root / "observing_log.jsonl"
         self.data_root.mkdir(parents=True, exist_ok=True)
 
-    def record_exposure(self, request: ExposureRequest, result: ExposureResult, snapshot: SystemSnapshot):
+    def process_exposure(self, request: ExposureRequest, result: ExposureResult, snapshot: SystemSnapshot):
+        update_fits_metadata(request, snapshot)
         entry = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "request": request.model_dump(mode="json"),
