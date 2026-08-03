@@ -62,8 +62,8 @@ class LensStatus(DeviceStatus):
 
 class TcsStatus(DeviceStatus):
     target_name: str | None = None
-    ra: str | None = None
-    dec: str | None = None
+    ra: float | None = None
+    dec: float | None = None
     altitude_deg: float | None = None
     azimuth_deg: float | None = None
     airmass: float | None = None
