@@ -134,10 +134,6 @@ def create_app():
         result = supervisor.capture_acquisition_preview(float(payload.get("exposure_s", 0.2)))
         return jsonify(result)
 
-    @app.post("/api/acquisition/center")
-    def api_acquisition_center():
-        return jsonify(supervisor.center_target_placeholder())
-
     @app.post("/api/motion/home")
     def api_motion_home():
         payload = request.get_json()
@@ -156,13 +152,21 @@ def create_app():
         supervisor.move_lens(request_model)
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
-    @app.post("/api/lens/focus-sweep")
-    def api_lens_focus_sweep():
-        return jsonify(supervisor.run_focus_sweep_placeholder())
-
     @app.post("/api/lens/calibrate")
     def api_lens_calibrate():
         supervisor.calibrate_lens()
+        return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
+    @app.post("/api/lens/aperture/absolute")
+    def api_lens_aperture_absolute():
+        payload = request.get_json()
+        supervisor.set_lens_aperture_absolute(float(payload["f_stop"]))
+        return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
+    @app.post("/api/lens/aperture/relative")
+    def api_lens_aperture_relative():
+        payload = request.get_json()
+        supervisor.set_lens_aperture_relative(float(payload["delta"]))
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
     @app.post("/api/tcs/goto-j2000")

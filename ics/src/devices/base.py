@@ -66,6 +66,14 @@ class LensFocusBackend(DeviceBackend):
     def calibrate(self):
         raise NotImplementedError
 
+    @abstractmethod
+    def set_aperture_absolute(self, f_stop: float):
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_aperture_relative(self, delta: float):
+        raise NotImplementedError
+
 
 class MotionBackend(DeviceBackend):
     @abstractmethod

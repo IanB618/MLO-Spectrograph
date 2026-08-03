@@ -405,24 +405,12 @@ document.addEventListener("click", (event) => {
     const payload = formPayload(form);
     runAndRefresh(() => api("/api/motion/home", {method: "POST", body: JSON.stringify({axis: payload.axis})}));
   }
-  if (action === "focus-sweep") {
-    runAndRefresh(async () => {
-      const result = await api("/api/lens/focus-sweep", {method: "POST"});
-      renderResult("lens-output", "Focus sweep result", {"Best position": result.best_position});
-    });
-  }
   if (action === "calibrate-lens") {
     runAndRefresh(async () => {
       await api("/api/lens/calibrate", {method: "POST"});
       renderResult("lens-output", "Lens calibration started", {
         "INDI property": "CALIBRATE.CALIBRATE",
       });
-    });
-  }
-  if (action === "center-target") {
-    runAndRefresh(async () => {
-      const result = await api("/api/acquisition/center", {method: "POST"});
-      renderResult("acq-output", "Centering result", {"Delta east": `${result.dx_arcsec} arcsec`, "Delta north": `${result.dy_arcsec} arcsec`});
     });
   }
 });
@@ -465,7 +453,39 @@ document.getElementById("motion-form").addEventListener("submit", (event) => {
 document.getElementById("lens-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["position", "delta"]);
-  runAndRefresh(() => api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)}));
+  runAndRefresh(async () => {
+    const result = await api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)});
+    const rows = payload.position !== undefined
+      ? {"Target position": payload.position}
+      : {"Relative move": `${payload.delta >= 0 ? "+" : ""}${payload.delta}`};
+    rows["Reported position"] = result.lens?.position ?? "--";
+    rows["State"] = result.lens?.state || "--";
+    renderResult("lens-output", "Lens focus move requested", rows);
+  });
+});
+
+document.getElementById("lens-aperture-absolute-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const payload = numericFields(formPayload(event.target), ["f_stop"]);
+  runAndRefresh(async () => {
+    await api("/api/lens/aperture/absolute", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("lens-output", "Lens aperture set", {
+      "Aperture": `f/${formatNumber(payload.f_stop, 2)}`,
+      "INDI property": "ABS_APERTURE.APERTURE_ABSOLUTE",
+    });
+  });
+});
+
+document.getElementById("lens-aperture-relative-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const payload = numericFields(formPayload(event.target), ["delta"]);
+  runAndRefresh(async () => {
+    await api("/api/lens/aperture/relative", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("lens-output", "Lens aperture adjusted", {
+      "Relative change": `${payload.delta >= 0 ? "+" : ""}${formatNumber(payload.delta, 2)}`,
+      "INDI property": "REL_APERTURE.APERTURE_RELATIVE",
+    });
+  });
 });
 
 document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {

@@ -103,6 +103,16 @@ class InstrumentSupervisor:
             self.devices.lens.calibrate()
             self._set_status(SystemState.IDLE, "Lens calibration started")
 
+    def set_lens_aperture_absolute(self, f_stop: float):
+        with self._operation_lock:
+            self.devices.lens.set_aperture_absolute(f_stop)
+            self._set_status(message=f"Lens aperture set to f/{f_stop:g}")
+
+    def set_lens_aperture_relative(self, delta: float):
+        with self._operation_lock:
+            self.devices.lens.set_aperture_relative(delta)
+            self._set_status(message=f"Lens aperture adjusted by {delta:+g}")
+
     def tcs_go_to_j2000(self, request: TcsGotoRequest):
         result = self.devices.tcs.go_to_j2000(request.ra_deg, request.dec_deg)
         self._set_status(message="TCS J2000 slew requested")
@@ -187,18 +197,6 @@ class InstrumentSupervisor:
         # for the camera, and abort must remain callable from another request.
         self.devices.science_camera.abort()
         self._set_status(message="Exposure abort requested")
-
-    def run_focus_sweep_placeholder(self):
-        with self._operation_lock:
-            self._set_status(SystemState.FOCUSING, "Focus sweep placeholder complete")
-            self._set_status(SystemState.IDLE)
-            return {"best_position": self.devices.lens.status().position}
-
-    def center_target_placeholder(self):
-        with self._operation_lock:
-            self._set_status(SystemState.ACQUIRING, "Guide camera target centering placeholder complete")
-            self._set_status(SystemState.IDLE)
-            return {"dx_arcsec": 0.0, "dy_arcsec": 0.0}
 
     def run_calibration_placeholder(self):
         with self._operation_lock:

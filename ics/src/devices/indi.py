@@ -518,6 +518,26 @@ class IndiFocuser(IndiDeviceBase):
         client = self._require_client()
         client.set_switch(self.device_name, "CALIBRATE", "CALIBRATE")
 
+    def set_aperture_absolute(self, f_stop: float):
+        if not 0.0 <= f_stop <= 327.67:
+            raise ValueError("Absolute aperture must be between 0 and 327.67")
+        client = self._require_client()
+        client.set_number(
+            self.device_name,
+            "ABS_APERTURE",
+            {"APERTURE_ABSOLUTE": f_stop},
+        )
+
+    def set_aperture_relative(self, delta: float):
+        if not -327.68 <= delta <= 327.67:
+            raise ValueError("Relative aperture adjustment must be between -327.68 and 327.67")
+        client = self._require_client()
+        client.set_number(
+            self.device_name,
+            "REL_APERTURE",
+            {"APERTURE_RELATIVE": delta},
+        )
+
     def _read_position(self) -> int:
         client = self._require_client()
         if client.get_property(self.device_name, "ABS_FOCUS_POSITION") is None:
