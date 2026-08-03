@@ -33,7 +33,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
     with fits.open(filepath, mode="update") as f:
         orig_header = f[0].header.copy()
-        for kw in ["COMMENT", "ROWORDER", "FOCUSTEM"]:
+        for kw in ["COMMENT", "ROWORDER", "FOCUSTEM", "FOCUSPOS"]:
             try:
                 _ = f[0].header.pop(kw)
             except KeyError:
@@ -50,8 +50,8 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         camera = f[0].header.get("INSTRUME", None)
         f[0].header.set("INSTRUME", "Fiber-Fed Spectrograph", "Instrument name", after="TELESCOP")
         f[0].header.set("CAMERA", camera, "Camera name (from INDI)", after="INSTRUME")
-        f[0].header.set("FILTER", "ThorLabs FGL400S", "ID of filter in use", after="CAMERA") # TODO
-        f[0].header.set("GRATING", "Newport 270R", "ID of grating in use", after="FILTER") # TODO
+        f[0].header.set("FILTER", "ThorLabs FGL400S", "Filter in use", after="CAMERA") # TODO: make configurable
+        f[0].header.set("GRATING", "Newport 270R", "Grating in use", after="FILTER") # TODO: make configurable
 
         f[0].header.set("OBJECT", request.object_name, "Target name", after="GRATING")
         f[0].header.set("RA", tcs_status.ra, "[deg] Nominal right ascension", after="OBJECT")
@@ -63,7 +63,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("STAGEX", after="DEC")
         f[0].header.set("STAGEY", after="STAGEX")
         f[0].header.set("STAGEZ", after="STAGEY")
-        f[0].header.rename_keyword("FOCUSPOS", "CAMFOCUS")
+        f[0].header.set("CAMFOCUS", system_status.lens.position, "Camera lens focus position", after="STAGEZ")
         f[0].header.set("TELFOCUS", None, "Telescope focus position", before="CAMFOCUS") # TODO: tcs_status.focus_position
 
         date_obs = Time(f[0].header.get("DATE-OBS"), format="fits", location=MLO)
@@ -74,5 +74,8 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
         f[0].header.set("TECPOWER", system_status.science_camera.cooler_power_pct, "[%] Thermoelectric cooler power", after="CCD-TEMP")
-        f[0].header.set("DATE", Time.now().isot, "Time HDU was created/modified")
-        f[0].add_checksum()
+        f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode")#, after="GAIN")
+
+        now = Time.now()
+        f[0].header.set("DATE", now.isot, "Time HDU was created/modified")
+        f[0].add_checksum(when="Checksum computed at " + now.datetime.isoformat(timespec="seconds") + "Z")
