@@ -9,7 +9,7 @@ from astropy.coordinates import EarthLocation, SkyCoord
 
 from .models import ExposureRequest, SystemSnapshot
 
-MLO = EarthLocation.of_site("Mount Laguna Observatory")
+MLO = EarthLocation(lat=32.841, lon=-116.427, height=1860.)
 
 def get_cpu_temp():
     cmd = ["sensors", "-j"]
@@ -42,8 +42,11 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
             if "BZERO" in f[0].header: # BZERO should come before BSCALE if present
                 f[0].header.set("BZERO", after="EXTEND")
 
-        f[0].header.set("LOCATION", "Mt Laguna Observatory", "Observatory name", after="BSCALE")
-        f[0].header.set("TELESCOP", "Claud 1.25-m Telescope", "Telescope name", after="LOCATION")
+        f[0].header.set("ORIGIN", "SDSU", "Responsible/originating institution", after="BSCALE")
+        f[0].header.set("LOCATION", "Mt Laguna Observatory", "Observatory name", after="ORIGIN")
+        f[0].header.set("LATITUDE", round(MLO.lat.deg, 3), "[deg] Location latitude", after="LOCATION")
+        f[0].header.set("LONGITUD", round(MLO.lon.deg, 3), "[deg] Location longitude", after="LATITUDE")
+        f[0].header.set("TELESCOP", "Claud 1.25-m Telescope", "Telescope name", after="LONGITUD")
         camera = f[0].header.get("INSTRUME", None)
         f[0].header.set("INSTRUME", "Fiber-Fed Spectrograph", "Instrument name", after="TELESCOP")
         f[0].header.set("CAMERA", camera, "Camera name (from INDI)", after="INSTRUME")
