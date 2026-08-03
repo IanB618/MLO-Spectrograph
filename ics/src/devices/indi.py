@@ -348,6 +348,7 @@ class IndiCcdCamera(IndiDeviceBase):
         self.binning = (1, 1)
         self.exposing = False
         self.last_result: ExposureResult | None = None
+        self._temperature_setpoint_c: float | None = None
         self._abort_requested = Event()
 
     def connect(self):
@@ -372,7 +373,7 @@ class IndiCcdCamera(IndiDeviceBase):
             ready=not exposing,
             state=state,
             temperature_c=temperature,
-            setpoint_c=temperature,
+            setpoint_c=self._temperature_setpoint_c,
             cooler_power_pct=cooler_power,
             exposing=exposing,
             binning=binning,
@@ -383,6 +384,7 @@ class IndiCcdCamera(IndiDeviceBase):
     def set_temperature(self, setpoint_c: float):
         client = self._require_client()
         client.set_number(self.device_name, "CCD_TEMPERATURE", {"CCD_TEMPERATURE_VALUE": setpoint_c})
+        self._temperature_setpoint_c = setpoint_c
 
     def expose(self, request: ExposureRequest) -> ExposureResult:
         client = self._require_client()
