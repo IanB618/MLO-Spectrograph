@@ -135,47 +135,6 @@ class IndiClient(PyIndi.BaseClient):
         prop = self._number_property(device_name, property_name)
         return {widget.getName(): widget.getValue() for widget in prop}
 
-    def set_telescope_info(
-        self,
-        device_name: str,
-        aperture_mm: float,
-        focal_length_mm: float,
-        guider_aperture_mm: float | None = None,
-        guider_focal_length_mm: float | None = None,
-    ) -> bool:
-        generic = self.get_property(device_name, "TELESCOPE_INFO")
-        if generic is None:
-            logger.info("INDI device %s does not expose TELESCOPE_INFO", device_name)
-            return False
-
-        prop = PyIndi.PropertyNumber(generic)
-        if not prop.isValid():
-            raise TypeError(f"{device_name}.TELESCOPE_INFO is not an INDI number property")
-
-        values = {
-            "TELESCOPE_APERTURE": aperture_mm,
-            "TELESCOPE_FOCAL_LENGTH": focal_length_mm,
-            "GUIDER_APERTURE": guider_aperture_mm if guider_aperture_mm is not None else aperture_mm,
-            "GUIDER_FOCAL_LENGTH": (
-                guider_focal_length_mm if guider_focal_length_mm is not None else focal_length_mm
-            ),
-        }
-
-        updated = []
-        for widget in prop:
-            name = widget.getName()
-            if name in values:
-                widget.setValue(values[name])
-                updated.append(name)
-
-        if not updated:
-            logger.warning("INDI device %s exposes TELESCOPE_INFO without recognized fields", device_name)
-            return False
-
-        self.sendNewNumber(prop)
-        logger.info("Set %s.TELESCOPE_INFO fields: %s", device_name, ", ".join(updated))
-        return True
-
     def set_switch(self, device_name: str, property_name: str, on_name: str):
         prop = self._switch_property(device_name, property_name)
         if hasattr(prop, "reset"):
@@ -382,18 +341,10 @@ class IndiCcdCamera(IndiDeviceBase):
         blob_property: str,
         connect_timeout_s: float,
         command_timeout_s: float,
-        telescope_aperture_mm: float | None = None,
-        telescope_focal_length_mm: float | None = None,
-        guider_aperture_mm: float | None = None,
-        guider_focal_length_mm: float | None = None,
     ):
         super().__init__(host, port, device_name, connect_timeout_s, command_timeout_s)
         self.data_root = data_root
         self.blob_property = blob_property
-        self.telescope_aperture_mm = telescope_aperture_mm
-        self.telescope_focal_length_mm = telescope_focal_length_mm
-        self.guider_aperture_mm = guider_aperture_mm
-        self.guider_focal_length_mm = guider_focal_length_mm
         self.binning = (1, 1)
         self.exposing = False
         self.last_result: ExposureResult | None = None
@@ -402,14 +353,6 @@ class IndiCcdCamera(IndiDeviceBase):
     def connect(self):
         super().connect()
         client = self._require_client()
-        if self.telescope_aperture_mm is not None and self.telescope_focal_length_mm is not None:
-            client.set_telescope_info(
-                self.device_name,
-                aperture_mm=self.telescope_aperture_mm,
-                focal_length_mm=self.telescope_focal_length_mm,
-                guider_aperture_mm=self.guider_aperture_mm,
-                guider_focal_length_mm=self.guider_focal_length_mm,
-            )
         client.request_blobs(self.device_name, self.blob_property)
 
     def status(self) -> CameraStatus:
