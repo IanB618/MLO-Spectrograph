@@ -1,0 +1,285 @@
+/*
+ * Dark presentation layer for the embedded JS9 viewer.
+ *
+ * JS9 3.9.0 ships with a light theme. Keep these overrides separate from
+ * app.css and scope the inline viewer to .science-js9-shell. JS9 menus and
+ * floating plugin windows are appended to <body>, so those rules are scoped
+ * with the page-level .ics-dark class and JS9-specific class names.
+ */
+
+.science-js9-shell {
+  --js9-dark-bg: #080b11;
+  --js9-dark-surface: #151a24;
+  --js9-dark-surface-raised: #202634;
+  --js9-dark-surface-hover: #2d3547;
+  --js9-dark-border: #3a4357;
+  --js9-dark-text: #eef0f4;
+  --js9-dark-muted: #b9c1d0;
+  --js9-dark-accent: #7fa7ff;
+  color-scheme: dark;
+  color: var(--js9-dark-text);
+}
+
+/* Inline JS9 frame and the areas surrounding the FITS pixels. */
+.science-js9-shell .JS9,
+.science-js9-shell .JS9Container,
+.science-js9-shell .JS9PluginContainer,
+.science-js9-shell .JS9Menubar,
+.science-js9-shell .JS9Colorbar,
+.science-js9-shell .JS9Statusbar {
+  color: var(--js9-dark-text) !important;
+  background-color: var(--js9-dark-bg) !important;
+}
+
+.science-js9-shell canvas.JS9Image,
+.science-js9-shell canvas.JS9Panner,
+.science-js9-shell canvas.JS9Magnifier,
+.science-js9-shell canvas.JS9Info {
+  background-color: var(--js9-dark-bg) !important;
+}
+
+/* Toolbar and pixel-information strip. */
+.science-js9-shell .JS9MenubarContainer,
+.science-js9-shell .JS9MenubarContainer-classic,
+.science-js9-shell .JS9MenubarContainer-flat,
+.science-js9-shell .JS9MenubarContainer-border,
+.science-js9-shell .JS9Message {
+  color: var(--js9-dark-text) !important;
+  background: var(--js9-dark-surface) !important;
+  border-color: var(--js9-dark-border) !important;
+  text-shadow: none !important;
+}
+
+
+/* JS9 uses input buttons rather than the application's normal <button>s. */
+.science-js9-shell .JS9Button,
+.science-js9-shell .JS9Button-classic,
+.science-js9-shell .JS9Button-flat,
+.science-js9-shell .JS9Button-border,
+.science-js9-shell .JS9Button2,
+.ics-dark .dhtmlwindow .JS9Button,
+.ics-dark .dhtmlwindow .JS9Button-classic,
+.ics-dark .dhtmlwindow .JS9Button-flat,
+.ics-dark .dhtmlwindow .JS9Button-border,
+.ics-dark .dhtmlwindow .JS9Button2 {
+  color: var(--js9-dark-text, #eef0f4) !important;
+  background: var(--js9-dark-surface-raised, #202634) !important;
+  border: 1px solid var(--js9-dark-border, #3a4357) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.science-js9-shell .JS9Button:hover,
+.science-js9-shell .JS9Button-classic:hover,
+.science-js9-shell .JS9Button-flat:hover,
+.science-js9-shell .JS9Button-border:hover,
+.science-js9-shell .JS9Button2:hover,
+.science-js9-shell .JS9Button:focus-visible,
+.science-js9-shell .JS9Button-classic:focus-visible,
+.science-js9-shell .JS9Button-flat:focus-visible,
+.science-js9-shell .JS9Button-border:focus-visible,
+.science-js9-shell .JS9Button2:focus-visible,
+.ics-dark .dhtmlwindow .JS9Button:hover,
+.ics-dark .dhtmlwindow .JS9Button2:hover {
+  color: #ffffff !important;
+  background: var(--js9-dark-surface-hover, #2d3547) !important;
+  border-color: var(--js9-dark-accent, #7fa7ff) !important;
+}
+
+.science-js9-shell .JS9Button:disabled,
+.science-js9-shell .JS9Button-classic:disabled,
+.science-js9-shell .JS9Button-flat:disabled,
+.science-js9-shell .JS9Button-border:disabled,
+.science-js9-shell .JS9Button2:disabled {
+  color: #858da0 !important;
+  background: #171c27 !important;
+  border-color: #2b3242 !important;
+  opacity: 1 !important;
+}
+
+/* Status bar beneath the colorbar. */
+.science-js9-shell .JS9StatusbarContainer,
+.science-js9-shell .JS9StatusbarItem {
+  color: var(--js9-dark-text) !important;
+  background-color: var(--js9-dark-surface) !important;
+}
+
+.science-js9-shell .JS9StatusbarItemNoHighlight {
+  border-color: transparent !important;
+}
+
+.science-js9-shell .JS9StatusbarItemHighlight,
+.science-js9-shell .JS9StatusbarItemHighlight2 {
+  color: #ffffff !important;
+  background-color: var(--js9-dark-surface-hover) !important;
+  border-color: var(--js9-dark-accent) !important;
+}
+
+/*
+ * JS9 draws colorbar tick labels into a black-on-white canvas. Inverting only
+ * that text canvas yields a dark strip with light labels without changing the
+ * actual colormap gradient or FITS pixels.
+ */
+.science-js9-shell canvas.JS9ColorbarCanvas {
+  border-color: var(--js9-dark-border) !important;
+}
+
+.science-js9-shell canvas.JS9ColorbarTextCanvas {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* Controls and content inside JS9 plugins. */
+.ics-dark .JS9Plugin,
+.ics-dark .JS9ConsoleContainer,
+.ics-dark .JS9Searchbar,
+.ics-dark .JS9Tooltip,
+.ics-dark .js9AnalysisForm,
+.ics-dark .JS9Archive-form,
+.ics-dark .js9HelpText {
+  color: #eef0f4 !important;
+  background: #151a24 !important;
+  border-color: #3a4357 !important;
+}
+
+.ics-dark .JS9Select,
+.ics-dark .JS9Text,
+.ics-dark .JS9TextArea,
+.ics-dark .JS9CmdIn,
+.ics-dark .JS9CmdOut,
+.ics-dark .js9Form input,
+.ics-dark .js9Form select,
+.ics-dark .js9Form textarea,
+.ics-dark .js9InfoTable input,
+.ics-dark .js9InfoTable textarea,
+.ics-dark .context-menu-item input,
+.ics-dark .context-menu-item select,
+.ics-dark .context-menu-item textarea {
+  color: #eef0f4 !important;
+  background: #0f141e !important;
+  border-color: #3a4357 !important;
+  caret-color: #eef0f4;
+}
+
+.ics-dark .JS9Text::placeholder,
+.ics-dark .JS9TextArea::placeholder,
+.ics-dark .js9Form input::placeholder,
+.ics-dark .js9Form textarea::placeholder {
+  color: #8f98aa !important;
+  opacity: 1;
+}
+
+/* Context menus opened by File/Edit/View/etc. are attached to <body>. */
+.ics-dark .context-menu-list,
+.ics-dark .context-menu-item,
+.ics-dark .context-menu-item.context-menu-disabled {
+  color: #eef0f4 !important;
+  background-color: #171d28 !important;
+  border-color: #3a4357 !important;
+}
+
+.ics-dark .context-menu-item.context-menu-hover {
+  color: #ffffff !important;
+  background-color: #33415c !important;
+}
+
+.ics-dark .context-menu-item.context-menu-disabled {
+  color: #747d90 !important;
+}
+
+.ics-dark .context-menu-separator {
+  border-bottom-color: #3a4357 !important;
+}
+
+.ics-dark .context-menu-submenu::after {
+  border-left-color: #b9c1d0 !important;
+}
+
+/* JS9's movable plugin and analysis windows use its dhtmlwindow classes. */
+.ics-dark .dhtmlwindow {
+  color: #eef0f4 !important;
+  background: #111620 !important;
+  border-color: #4a556d !important;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.5);
+}
+
+.ics-dark .drag-handle {
+  color: #eef0f4 !important;
+  background: #202634 !important;
+  border-bottom: 1px solid #3a4357 !important;
+  text-shadow: none !important;
+}
+
+.ics-dark .drag-contentarea {
+  color: #eef0f4 !important;
+  background: #151a24 !important;
+}
+
+.ics-dark .indentmenu ul {
+  background: #111620 !important;
+}
+
+.ics-dark .indentmenu ul li a {
+  color: #dce2ed !important;
+  background: #202634 !important;
+  border-right-color: #151a24 !important;
+}
+
+.ics-dark .indentmenu ul li a:hover,
+.ics-dark .indentmenu ul li a.hover,
+.ics-dark .indentmenu ul li a.selected {
+  color: #ffffff !important;
+  background: #33415c !important;
+}
+
+/* jQuery UI widgets used by some JS9 plugins. */
+.ics-dark .ui-widget,
+.ics-dark .ui-widget input,
+.ics-dark .ui-widget select,
+.ics-dark .ui-widget textarea,
+.ics-dark .ui-widget button {
+  color: #eef0f4;
+}
+
+.ics-dark .ui-widget-content,
+.ics-dark .ui-dialog,
+.ics-dark .ui-menu {
+  color: #eef0f4 !important;
+  background: #151a24 !important;
+  border-color: #3a4357 !important;
+}
+
+.ics-dark .ui-widget-header,
+.ics-dark .ui-dialog-titlebar {
+  color: #eef0f4 !important;
+  background: #202634 !important;
+  border-color: #3a4357 !important;
+}
+
+.ics-dark .ui-state-default,
+.ics-dark .ui-button,
+.ics-dark .ui-menu-item-wrapper {
+  color: #eef0f4 !important;
+  background: #202634 !important;
+  border-color: #3a4357 !important;
+  text-shadow: none !important;
+}
+
+.ics-dark .ui-state-hover,
+.ics-dark .ui-state-focus,
+.ics-dark .ui-state-active,
+.ics-dark .ui-button:hover,
+.ics-dark .ui-menu-item-wrapper.ui-state-active {
+  color: #ffffff !important;
+  background: #33415c !important;
+  border-color: #7fa7ff !important;
+}
+
+.ics-dark .ui-icon,
+.ics-dark .dhtmlwindow .drag-controls img {
+  filter: invert(0.9) brightness(1.25);
+}
+
+.ics-dark .context-menu-icon-check::before {
+  filter: invert(1);
+}

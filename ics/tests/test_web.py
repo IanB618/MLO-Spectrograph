@@ -91,6 +91,8 @@ def test_index_embeds_js9_and_full_width_science_card():
     assert response.status_code == 200
     assert "js9-allinone.css" in html
     assert "js9-allinone.js" in html
+    assert "css/js9-dark.css" in html
+    assert '<body class="ics-dark">' in html
     assert 'id="scienceJS9"' in html
     assert 'class="card span-2 science-camera-card"' in html
 
