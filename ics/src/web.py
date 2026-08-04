@@ -137,6 +137,10 @@ def create_app():
         if result is None:
             abort(404, description="No science exposure is available for preview.")
 
+        requested_exposure_id = request.args.get("exposure_id")
+        if requested_exposure_id and requested_exposure_id != result.exposure_id:
+            abort(409, description="The requested science exposure is no longer the latest completed exposure.")
+
         path = Path(result.path).resolve()
         data_root = Path(app.config["ICS_DATA_ROOT"]).resolve()
         try:
@@ -157,11 +161,12 @@ def create_app():
             mimetype="application/fits",
             as_attachment=False,
             download_name=path.name,
-            conditional=True,
-            etag=True,
-            last_modified=path.stat().st_mtime,
+            conditional=False,
+            etag=False,
         )
-        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 

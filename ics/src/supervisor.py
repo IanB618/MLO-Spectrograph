@@ -138,14 +138,15 @@ class InstrumentSupervisor:
             result: ExposureResult | None = None
             try:
                 result = self.devices.science_camera.expose(request)
-                with self._state_lock:
-                    self.last_exposure = result
-                self._set_status(SystemState.IDLE, result.message)
+                self._set_status(SystemState.EXPOSING, "Finalizing science exposure")
 
                 log_snapshot: SystemSnapshot | None = None
                 try:
-                    log_snapshot = self.snapshot()
+                    log_snapshot = self.snapshot().model_copy(update={"last_exposure": result})
                     self.data_manager.process_exposure(request, result, log_snapshot)
+                    with self._state_lock:
+                        self.last_exposure = result
+                    self._set_status(SystemState.IDLE, result.message)
                 except Exception as exc:
                     result.success = False
                     result.message = f"FITS saved, but exposure post-processing failed: {exc}"

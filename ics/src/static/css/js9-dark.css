@@ -22,13 +22,21 @@
 
 /* Inline JS9 frame and the areas surrounding the FITS pixels. */
 .science-js9-shell .JS9,
-.science-js9-shell .JS9Container,
-.science-js9-shell .JS9PluginContainer,
 .science-js9-shell .JS9Menubar,
 .science-js9-shell .JS9Colorbar,
 .science-js9-shell .JS9Statusbar {
   color: var(--js9-dark-text) !important;
   background-color: var(--js9-dark-bg) !important;
+}
+
+/*
+ * JS9 stacks multiple absolute-positioned containers for the image and its
+ * transparent graphics layers. These containers must remain transparent;
+ * an opaque background on an upper layer covers the rendered FITS image.
+ */
+.science-js9-shell .JS9Container,
+.science-js9-shell .JS9PluginContainer {
+  background-color: transparent !important;
 }
 
 .science-js9-shell canvas.JS9Image,

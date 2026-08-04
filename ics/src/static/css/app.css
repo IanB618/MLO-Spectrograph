@@ -11,7 +11,6 @@
   --text: #eef0f4;
   --muted: #aeb6c6;
   --accent: #7fa7ff;
-  --danger: #ad3434;
   --warning: #c89737;
   --good: #3b9d67;
 }
@@ -175,11 +174,6 @@ button {
 
 button:hover {
   background: #30384a;
-}
-
-button.danger {
-  background: #6b1d1d;
-  border-color: var(--danger);
 }
 
 button.secondary {
@@ -382,7 +376,7 @@ code {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 .science-camera-controls {
@@ -391,11 +385,15 @@ code {
 
 .science-preview-panel {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding-left: 1.25rem;
   border-left: 1px solid var(--line-soft);
 }
 
 .science-preview-header {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -425,10 +423,12 @@ code {
 .science-js9-shell {
   width: 100%;
   min-height: 570px;
-  overflow: auto;
+  flex: 1 1 auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
+  justify-content: flex-start;
   padding: 0.55rem;
   background: #07090d;
   border: 1px solid var(--line-soft);

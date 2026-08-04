@@ -299,6 +299,10 @@ const sciencePreviewState = {
   image: null,
   loadTimer: null,
   loadSequence: 0,
+  displayWidth: null,
+  displayHeight: null,
+  resizeObserver: null,
+  resizeFrame: null,
 };
 
 function setSciencePreviewStatus(message, tone = "muted") {
@@ -321,11 +325,120 @@ function scienceJs9DisplayExists() {
   }
 }
 
+function scienceJs9PluginHeight(elementId) {
+  const element = document.getElementById(elementId);
+  return element ? Math.ceil(element.getBoundingClientRect().height) : 0;
+}
+
+function getScienceJs9TargetDimensions() {
+  const shell = document.querySelector(".science-js9-shell");
+  if (!shell) {
+    return null;
+  }
+
+  const style = window.getComputedStyle(shell);
+  const horizontalPadding =
+    Number.parseFloat(style.paddingLeft || "0") +
+    Number.parseFloat(style.paddingRight || "0");
+  const verticalPadding =
+    Number.parseFloat(style.paddingTop || "0") +
+    Number.parseFloat(style.paddingBottom || "0");
+
+  const width = Math.floor(shell.clientWidth - horizontalPadding);
+  const pluginHeight =
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Menubar`) +
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Colorbar`) +
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Statusbar`);
+  const height = Math.floor(shell.clientHeight - verticalPadding - pluginHeight);
+
+  return {
+    width: Math.max(320, width),
+    height: Math.max(280, height),
+  };
+}
+
+function fitScienceJs9Image() {
+  if (!sciencePreviewState.image || !window.JS9) {
+    return;
+  }
+  try {
+    window.JS9.SetZoom("toFit", {display: sciencePreviewState.image});
+  } catch (error) {
+    console.error("Could not fit the JS9 science image", error);
+  }
+}
+
+function resizeScienceJs9({force = false} = {}) {
+  if (!sciencePreviewState.ready || !window.JS9) {
+    return;
+  }
+
+  const target = getScienceJs9TargetDimensions();
+  if (!target) {
+    return;
+  }
+
+  const widthChanged = Math.abs(target.width - (sciencePreviewState.displayWidth || 0)) >= 2;
+  const heightChanged = Math.abs(target.height - (sciencePreviewState.displayHeight || 0)) >= 2;
+  if (!force && !widthChanged && !heightChanged) {
+    return;
+  }
+
+  try {
+    window.JS9.ResizeDisplay(
+      SCIENCE_JS9_DISPLAY_ID,
+      target.width,
+      target.height,
+      {
+        resizeMenubar: true,
+        resizeColorbar: true,
+        resizeStatusbar: true,
+      },
+    );
+    sciencePreviewState.displayWidth = target.width;
+    sciencePreviewState.displayHeight = target.height;
+
+    window.requestAnimationFrame(() => {
+      fitScienceJs9Image();
+      // Menubar wrapping can change its height after a width update. A second
+      // pass converges on the remaining image height without creating a loop.
+      scheduleScienceJs9Resize();
+    });
+  } catch (error) {
+    console.error("Could not resize the JS9 science display", error);
+  }
+}
+
+function scheduleScienceJs9Resize() {
+  if (sciencePreviewState.resizeFrame !== null) {
+    window.cancelAnimationFrame(sciencePreviewState.resizeFrame);
+  }
+  sciencePreviewState.resizeFrame = window.requestAnimationFrame(() => {
+    sciencePreviewState.resizeFrame = null;
+    resizeScienceJs9();
+  });
+}
+
+function observeScienceJs9Size() {
+  const shell = document.querySelector(".science-js9-shell");
+  if (!shell) {
+    return;
+  }
+
+  if (window.ResizeObserver) {
+    sciencePreviewState.resizeObserver = new ResizeObserver(scheduleScienceJs9Resize);
+    sciencePreviewState.resizeObserver.observe(shell);
+  } else {
+    window.addEventListener("resize", scheduleScienceJs9Resize);
+  }
+}
+
 function markScienceJs9Ready() {
   if (sciencePreviewState.ready || !scienceJs9DisplayExists()) {
     return;
   }
   sciencePreviewState.ready = true;
+  resizeScienceJs9({force: true});
   setSciencePreviewStatus("JS9 ready; no science exposure loaded.");
   loadLatestSciencePreview();
 }
@@ -340,6 +453,7 @@ function initializeScienceJs9() {
   }
 
   window.jQuery(document).on("JS9:ready", markScienceJs9Ready);
+  observeScienceJs9Size();
   markScienceJs9Ready();
 
   // JS9 normally becomes ready at DOM-ready time. This also covers pages where
@@ -396,9 +510,10 @@ function loadLatestSciencePreview({force = false} = {}) {
   const exposureId = exposure.exposure_id;
   const loadSequence = ++sciencePreviewState.loadSequence;
   const imageId = `${exposureId}.fits`;
+  const refreshImage = sciencePreviewState.image;
   const requestUrl = new URL("/api/science-camera/latest.fits", window.location.origin);
   requestUrl.searchParams.set("exposure_id", exposureId);
-  requestUrl.searchParams.set("v", exposureId);
+  requestUrl.searchParams.set("revision", `${exposureId}-${loadSequence}-${Date.now()}`);
 
   sciencePreviewState.loadingExposureId = exposureId;
   setSciencePreviewStatus(`Loading ${exposureId}...`);
@@ -421,10 +536,12 @@ function loadLatestSciencePreview({force = false} = {}) {
         file: imageId,
         scale: "linear",
         colormap: "grey",
-        refresh: force,
+        refresh: refreshImage || false,
         onload: (image) => {
           if (sciencePreviewState.loadSequence !== loadSequence) {
-            window.JS9.CloseImage({display: image});
+            if (image && image !== sciencePreviewState.image) {
+              window.JS9.CloseImage({display: image});
+            }
             return;
           }
           if (sciencePreviewState.loadTimer) {
@@ -439,7 +556,8 @@ function loadLatestSciencePreview({force = false} = {}) {
 
           window.JS9.SetColormap("grey", {display: image});
           window.JS9.SetScale("zscale", {display: image});
-          window.JS9.SetZoom("toFit", {display: image});
+          resizeScienceJs9({force: true});
+          fitScienceJs9Image();
           setSciencePreviewStatus(`Displaying ${exposureId}.`, "ready");
 
           if (previousImage && previousImage !== image) {
@@ -636,6 +754,7 @@ bindSubmit("exposure-form", (event) => {
       "Exposure": `${result.exposure_s} s`,
       "File": result.path,
     });
+    syncSciencePreview(result);
   });
 });
 
