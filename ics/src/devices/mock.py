@@ -1,10 +1,12 @@
 from pathlib import Path
 
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+from astropy import units as u
 
 from src.models import AxisStatus, CameraStatus, TcsStatus
 
-
+MLO = EarthLocation(lat=32.841*u.deg, lon=-116.427*u.deg, height=1860*u.m)
 class MockAcquisitionCamera:
     def __init__(self, data_root: Path):
         self.data_root = data_root
@@ -108,10 +110,32 @@ class MockTcs:
         return SkyCoord(ra=self.ra_deg, dec=self.dec_deg,
                         unit="deg", frame="icrs")
 
+    def get_altaz(self, obstime: Time | None = None, location: EarthLocation = MLO):
+        if obstime is None:
+            obstime = Time.now()
+        elif not isinstance(obstime, Time):
+            obstime = Time(obstime)
+        altaz_frame = AltAz(obstime=obstime, location=location)
+        altaz = self.skycoord().transform_to(altaz_frame)
+        return altaz.alt, altaz.az
+
+    def get_airmass(self, obstime: Time | None = None, location: EarthLocation = MLO) -> float:
+        if obstime is None:
+            obstime = Time.now()
+        elif not isinstance(obstime, Time):
+            obstime = Time(obstime)
+        altaz_frame = AltAz(obstime=obstime, location=location)
+        altaz = self.skycoord().transform_to(altaz_frame)
+        if altaz.alt.deg < 0 :
+            return float("inf")
+        return float(altaz.secz)
+
     def radec_str(self) -> tuple[str]:
         return self.skycoord.to_string("hmsdms")
 
     def status(self) -> TcsStatus:
+        alt, az = self.get_altaz()
+        airmass = self.get_airmass()
         return TcsStatus(
             name="ACE TCS Adapter",
             connected=self.connected,
@@ -120,9 +144,9 @@ class MockTcs:
             target_name="Mock Target",
             ra=self.ra_deg,
             dec=self.dec_deg,
-            altitude_deg=62.1,
-            azimuth_deg=211.3,
-            airmass=1.13,
+            altitude_deg=float(alt.to("deg").value),
+            azimuth_deg=float(az.to("deg").value),
+            airmass=airmass,
             tracking=self.connected,
             guiding=False,
         )
