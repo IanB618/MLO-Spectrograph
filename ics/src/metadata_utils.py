@@ -3,6 +3,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import cv2
+import numpy as np
 from astropy.io import fits
 from astropy.time import Time
 from astropy.coordinates import EarthLocation, SkyCoord
@@ -10,6 +12,13 @@ from astropy.coordinates import EarthLocation, SkyCoord
 from .models import ExposureRequest, SystemSnapshot
 
 MLO = EarthLocation(lat=32.841, lon=-116.427, height=1860.)
+BAYER_TO_OPENCV_RGB = {
+    "RGGB": cv2.COLOR_BAYER_RGGB2RGB,
+    "BGGR": cv2.COLOR_BAYER_BGGR2RGB,
+    "GRBG": cv2.COLOR_BAYER_GRBG2RGB,
+    "GBRG": cv2.COLOR_BAYER_GBRG2RGB,
+}
+
 
 def get_cpu_temp():
     cmd = ["sensors", "-j"]
@@ -23,6 +32,37 @@ def get_cpu_temp():
     except (KeyError, json.JSONDecodeError):
         return None
 
+def debayer_fits(filepath: Path) -> None:
+    with fits.open(filepath, mode="update") as f:
+        pattern = str(f[0].header.get("BAYERPAT", "")).upper().strip()
+        if pattern not in BAYER_TO_OPENCV_RGB:
+            raise ValueError(f"Unsupported or missing BAYERPAT value: {pattern!r}")
+
+        data = np.asarray(f[0].data)
+        if data.ndim != 2:
+            raise ValueError("Expected a 2D Bayer-matrix image before debayering")
+
+        if np.issubdtype(data.dtype, np.floating):
+            finite = np.isfinite(data)
+            if not finite.any():
+                raise ValueError("Input image does not contain any finite values")
+            scale = float(np.nanmax(data[finite])) / 65535.0
+            scale = max(scale, 1e-6)
+            uint_data = np.clip(np.rint(data / scale), 0, 65535).astype(np.uint16)
+        elif np.nanmax(data) > 65535 or np.nanmin(data) < 0:
+            raise TypeError("Cannot handle int values that fall outside uint16 range")
+        else:
+            scale = 1.0
+            uint_data = data.astype(np.uint16, copy=False)
+
+        debayered = cv2.cvtColor(np.ascontiguousarray(uint_data), BAYER_TO_OPENCV_RGB[pattern])
+        greyscale = np.mean(debayered, axis=-1)
+        assert greyscale.shape == data.shape
+        f[0].data = greyscale
+        for kw in ["BAYERPAT", "XBAYROFF", "YBAYROFF"]:
+            if kw in f[0].header:
+                _ = f[0].header.pop(kw)
+
 def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot):
     filepath = system_status.last_exposure.path
     exp_result = system_status.last_exposure
@@ -31,8 +71,11 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
     if not filepath.exists():
         raise FileNotFoundError(filepath.as_posix())
 
+    orig_header = fits.getheader(filepath).copy()
+    if "BAYERPAT" in orig_header:
+        debayer_fits(filepath)
+
     with fits.open(filepath, mode="update") as f:
-        orig_header = f[0].header.copy()
         for kw in ["COMMENT", "ROWORDER", "FOCUSTEM", "FOCUSPOS"]:
             try:
                 _ = f[0].header.pop(kw)
