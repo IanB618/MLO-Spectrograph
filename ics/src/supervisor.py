@@ -60,6 +60,11 @@ class InstrumentSupervisor:
             last_exposure=last_exposure,
         )
 
+    def latest_exposure(self) -> ExposureResult | None:
+        with self._state_lock:
+            result = self.last_exposure
+        return result.model_copy(deep=True) if result is not None else None
+
     def set_science_temperature(self, setpoint_c: float):
         self.devices.science_camera.set_temperature(setpoint_c)
         self._set_status(message=f"Science camera setpoint set to {setpoint_c:.1f} C")

@@ -290,6 +290,176 @@ function renderResult(targetId, title, rows) {
   `;
 }
 
+const SCIENCE_JS9_DISPLAY_ID = "scienceJS9";
+const sciencePreviewState = {
+  ready: false,
+  latestExposure: null,
+  loadedExposureId: null,
+  loadingExposureId: null,
+  image: null,
+  loadTimer: null,
+  loadSequence: 0,
+};
+
+function setSciencePreviewStatus(message, tone = "muted") {
+  const target = document.getElementById("science-preview-status");
+  if (!target) {
+    return;
+  }
+  target.textContent = message;
+  target.dataset.tone = tone;
+}
+
+function scienceJs9DisplayExists() {
+  if (!window.JS9) {
+    return false;
+  }
+  try {
+    return Boolean(window.JS9.LookupDisplay(SCIENCE_JS9_DISPLAY_ID, false));
+  } catch (error) {
+    return false;
+  }
+}
+
+function markScienceJs9Ready() {
+  if (sciencePreviewState.ready || !scienceJs9DisplayExists()) {
+    return;
+  }
+  sciencePreviewState.ready = true;
+  setSciencePreviewStatus("JS9 ready; no science exposure loaded.");
+  loadLatestSciencePreview();
+}
+
+function initializeScienceJs9() {
+  if (window.__js9LoadError || !window.JS9 || !window.jQuery) {
+    setSciencePreviewStatus(
+      "JS9 could not be loaded. Check network access or ICS_JS9_ASSET_BASE.",
+      "error",
+    );
+    return;
+  }
+
+  window.jQuery(document).on("JS9:ready", markScienceJs9Ready);
+  markScienceJs9Ready();
+
+  // JS9 normally becomes ready at DOM-ready time. This also covers pages where
+  // its ready event fired before this application handler was registered.
+  let attempts = 0;
+  const readyPoll = window.setInterval(() => {
+    attempts += 1;
+    markScienceJs9Ready();
+    if (sciencePreviewState.ready || attempts >= 40) {
+      window.clearInterval(readyPoll);
+      if (!sciencePreviewState.ready) {
+        setSciencePreviewStatus("JS9 did not initialize its science display.", "error");
+      }
+    }
+  }, 250);
+}
+
+function syncSciencePreview(exposure) {
+  sciencePreviewState.latestExposure = exposure || null;
+  if (!exposure) {
+    if (!sciencePreviewState.loadedExposureId && !sciencePreviewState.loadingExposureId) {
+      setSciencePreviewStatus(
+        sciencePreviewState.ready
+          ? "No completed science exposure is available."
+          : "Waiting for JS9 and a completed science exposure.",
+      );
+    }
+    return;
+  }
+
+  if (
+    exposure.exposure_id === sciencePreviewState.loadedExposureId ||
+    exposure.exposure_id === sciencePreviewState.loadingExposureId
+  ) {
+    return;
+  }
+  loadLatestSciencePreview();
+}
+
+function loadLatestSciencePreview({force = false} = {}) {
+  const exposure = sciencePreviewState.latestExposure;
+  if (!exposure) {
+    setSciencePreviewStatus("No completed science exposure is available.");
+    return;
+  }
+  if (!sciencePreviewState.ready) {
+    setSciencePreviewStatus(`Waiting for JS9 to display ${exposure.exposure_id}.`);
+    return;
+  }
+  if (!force && exposure.exposure_id === sciencePreviewState.loadedExposureId) {
+    return;
+  }
+
+  const exposureId = exposure.exposure_id;
+  const loadSequence = ++sciencePreviewState.loadSequence;
+  const imageId = `${exposureId}.fits`;
+  const requestUrl = new URL("/api/science-camera/latest.fits", window.location.origin);
+  requestUrl.searchParams.set("exposure_id", exposureId);
+  requestUrl.searchParams.set("v", exposureId);
+
+  sciencePreviewState.loadingExposureId = exposureId;
+  setSciencePreviewStatus(`Loading ${exposureId}...`);
+
+  if (sciencePreviewState.loadTimer) {
+    window.clearTimeout(sciencePreviewState.loadTimer);
+  }
+  sciencePreviewState.loadTimer = window.setTimeout(() => {
+    if (sciencePreviewState.loadSequence === loadSequence) {
+      sciencePreviewState.loadingExposureId = null;
+      setSciencePreviewStatus(`JS9 timed out while loading ${exposureId}.`, "error");
+    }
+  }, 60000);
+
+  try {
+    window.JS9.Load(
+      requestUrl.toString(),
+      {
+        id: imageId,
+        file: imageId,
+        scale: "linear",
+        colormap: "grey",
+        refresh: force,
+        onload: (image) => {
+          if (sciencePreviewState.loadSequence !== loadSequence) {
+            window.JS9.CloseImage({display: image});
+            return;
+          }
+          if (sciencePreviewState.loadTimer) {
+            window.clearTimeout(sciencePreviewState.loadTimer);
+            sciencePreviewState.loadTimer = null;
+          }
+
+          const previousImage = sciencePreviewState.image;
+          sciencePreviewState.image = image;
+          sciencePreviewState.loadedExposureId = exposureId;
+          sciencePreviewState.loadingExposureId = null;
+
+          window.JS9.SetColormap("grey", {display: image});
+          window.JS9.SetScale("zscale", {display: image});
+          window.JS9.SetZoom("toFit", {display: image});
+          setSciencePreviewStatus(`Displaying ${exposureId}.`, "ready");
+
+          if (previousImage && previousImage !== image) {
+            window.JS9.CloseImage({display: previousImage});
+          }
+        },
+      },
+      {display: SCIENCE_JS9_DISPLAY_ID},
+    );
+  } catch (error) {
+    if (sciencePreviewState.loadTimer) {
+      window.clearTimeout(sciencePreviewState.loadTimer);
+      sciencePreviewState.loadTimer = null;
+    }
+    sciencePreviewState.loadingExposureId = null;
+    setSciencePreviewStatus(`Could not load FITS preview: ${error.message || error}`, "error");
+    console.error("JS9 FITS preview load failed", error);
+  }
+}
+
 function updateStatus(status) {
   setBadge("system-state-badge", stateBadge(status.state));
   setText("system-message", status.message || "--");
@@ -328,6 +498,8 @@ function updateStatus(status) {
     setText("last-exposure-summary", "None");
     setText("last-exposure-note", "No science exposure recorded.");
   }
+
+  syncSciencePreview(status.last_exposure);
 
   renderKeyGrid("tcs-status", [
     ["Connection", tcs.connected ? "Connected" : "Offline"],
@@ -428,6 +600,9 @@ document.addEventListener("click", (event) => {
   }
   if (action === "abort-exposure") {
     runAndRefresh(() => api("/api/science-camera/abort", {method: "POST"}));
+  }
+  if (action === "reload-science-preview") {
+    loadLatestSciencePreview({force: true});
   }
   if (action === "home-axis") {
     const form = document.getElementById("motion-form");
@@ -545,6 +720,7 @@ bindSubmit("tcs-offset-form", (event) => {
   });
 });
 
+initializeScienceJs9();
 initializePage();
 setInterval(() => poll(refreshStatus), 2000);
 setInterval(() => poll(refreshLog), 10000);

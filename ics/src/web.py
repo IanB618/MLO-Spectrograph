@@ -1,7 +1,8 @@
 import logging
 from http import HTTPStatus
+from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request, send_file
 from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
@@ -95,7 +96,9 @@ def create_app():
 
     @app.get("/")
     def index():
-        return render_template("index.html", site_name=app.config["ICS_SITE_NAME"])
+        return render_template("index.html",
+                               site_name=app.config["ICS_SITE_NAME"],
+                               js9_asset_base=app.config["ICS_JS9_ASSET_BASE"])
 
     @app.get("/api/status")
     def api_status():
@@ -127,6 +130,40 @@ def create_app():
     def api_science_abort():
         supervisor.abort_exposure()
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
+    @app.get("/api/science-camera/latest.fits")
+    def api_science_latest_fits():
+        result = supervisor.latest_exposure()
+        if result is None:
+            abort(404, description="No science exposure is available for preview.")
+
+        path = Path(result.path).resolve()
+        data_root = Path(app.config["ICS_DATA_ROOT"]).resolve()
+        try:
+            path.relative_to(data_root)
+        except ValueError:
+            logger.error("Refusing to serve science preview outside data root: %s", path)
+            abort(404, description="The latest science exposure is not available for preview.")
+
+        if not path.is_file():
+            abort(404, description="The latest science FITS file does not exist.")
+
+        lower_name = path.name.lower()
+        if not lower_name.endswith((".fits", ".fit", ".fts", ".fits.gz", ".fit.gz", ".fts.gz", ".fz")):
+            abort(415, description="The latest science exposure is not a supported FITS file.")
+
+        response = send_file(
+            path,
+            mimetype="application/fits",
+            as_attachment=False,
+            download_name=path.name,
+            conditional=True,
+            etag=True,
+            last_modified=path.stat().st_mtime,
+        )
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.post("/api/acquisition/preview")
     def api_acquisition_preview():
