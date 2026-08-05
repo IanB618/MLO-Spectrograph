@@ -1,4 +1,4 @@
-# ICS - Instrument Control Software
+# Instrument Control Software (ICS)
 
 Flask-based instrument control software for fiber-fed spectrograph.
 
@@ -13,7 +13,7 @@ This software provides:
 - ACE Connector guide-camera adapter for preview/acquisition frames through the existing telescope guide camera
 - ACE Connector guide-stage adapter for stage axes exposed through ACE focuser-style interfaces
 - Observation sequence hooks
-- FITS/data-product placeholders
+- FITS/data product generation and processing
 - Basic tests
 
 ## Deployment architecture
@@ -23,60 +23,35 @@ The current deployment concept is:
 ```text
 Instrument-side Raspberry Pi
   - Flask ICS web server on the LAN
-  - INDI server on 127.0.0.1:7624
+  - INDI server on localhost:7624
   - USB connection to FLI Kepler spectrograph camera
   - USB connection to Pinefeat Canon EF lens controller
-  - ACE Connector client connection to the telescope-control system
+  - ACE Connector client connection to the telescope control system
 
-ACE / telescope-control system
+ACE telescope control system (TCS)
   - telescope pointing
-  - existing guide camera used for acquisition/centering
-  - existing guide-camera stage used for stage motion
-  - facility/main CCD and guide camera control remain primarily under ACE
+  - main CCD and guide camera control/image retrieval
+  - existing guide camera used for target acquisition
+  - existing guide camera stage used for X/Y/Z motion
 ```
 
 ## Run locally (for development)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
 flask --app src.web:create_app run --host 0.0.0.0 --port 5000
 ```
 
-Open `http://<instrument-host>:5000` from the LAN.
+Open `http://localhost:5000` in a browser.
 
 ## Run on the Pi with INDI + ACE
-
-Example `.env` settings:
-
-```bash
-ICS_INDI_HOST=127.0.0.1
-ICS_INDI_PORT=7624
-ICS_INDI_CCD_DEVICE=FLI Kepler
-ICS_INDI_FOCUSER_DEVICE=Pinefeat CEF
-ICS_INDI_CCD_BLOB_PROPERTY=CCD1
-
-ICS_TCS_BACKEND=ace
-ICS_GUIDE_CAMERA_BACKEND=ace
-ICS_STAGE_BACKEND=ace
-ICS_ACE_HOST=192.168.1.20
-ICS_ACE_PORT=9889
-ICS_ACE_NODE=Telescope PC
-ICS_ACE_TELESCOPE_NAME=Telescope
-ICS_ACE_GUIDE_CAMERA_NODE=Telescope PC
-ICS_ACE_GUIDE_CAMERA_NAME=Guide Camera
-ICS_ACE_STAGE_NODE=Telescope PC
-ICS_ACE_STAGE_X_NAME=Guide Stage X
-ICS_ACE_STAGE_Y_NAME=Guide Stage Y
-ICS_ACE_STAGE_FOCUS_NAME=
-```
 
 Start `indiserver` on the same Pi with the Kepler CCD and Pinefeat focuser drivers, then start the Flask app:
 
 ```bash
 flask --app src.web:create_app run --host 0.0.0.0 --port 5000
 ```
+
+Open `http://<Raspberry Pi's IP address>:5000` in a browser.
 
 ## ACE Connector backends
 
@@ -117,8 +92,6 @@ focuser.stop()
 
 Copy `.env.example` to `.env` and adjust values.
 
-By default, all devices use mock backends. Set `ICS_BACKEND_MODE=indi` to use the local INDI server for the spectrograph science camera and lens controller. Set `ICS_TCS_BACKEND=ace`, `ICS_GUIDE_CAMERA_BACKEND=ace`, and `ICS_STAGE_BACKEND=ace` to use ACE Connector for telescope pointing, acquisition/guide imaging, and guide-stage motion.
-
 ## Architecture
 
 ```text
@@ -136,5 +109,4 @@ InstrumentSupervisor
 
 ## Development notes
 
-The UI intentionally talks only to the Flask API. It does not know device-specific protocols.
-The supervisor exposes domain-level operations such as acquisition, centering, focusing, calibration, and science exposure.
+The web UI intentionally talks only to the Flask API; it does not know anything about device-specific protocols. The supervisor exposes domain-level operations such as acquisition, focusing, calibration, and science exposure.
