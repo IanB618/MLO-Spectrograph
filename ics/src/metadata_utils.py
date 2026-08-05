@@ -74,7 +74,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         raise FileNotFoundError(filepath.as_posix())
 
     orig_header = fits.getheader(filepath).copy()
-    if "BAYERPAT" in orig_header:
+    if "BAYERPAT" in orig_header and "light" in orig_header.get("IMAGETYP", "").lower():
         debayer_fits(filepath)
 
     with fits.open(filepath, mode="update") as f:
