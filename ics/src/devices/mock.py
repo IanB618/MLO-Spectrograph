@@ -7,6 +7,8 @@ from astropy import units as u
 from src.models import AxisStatus, CameraStatus, TcsStatus
 
 MLO = EarthLocation(lat=32.841*u.deg, lon=-116.427*u.deg, height=1860*u.m)
+
+
 class MockAcquisitionCamera:
     def __init__(self, data_root: Path):
         self.data_root = data_root

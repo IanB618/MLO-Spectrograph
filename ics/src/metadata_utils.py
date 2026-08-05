@@ -58,7 +58,9 @@ def debayer_fits(filepath: Path) -> None:
         debayered = cv2.cvtColor(np.ascontiguousarray(uint_data), BAYER_TO_OPENCV_RGB[pattern])
         greyscale = np.mean(debayered, axis=-1)
         assert greyscale.shape == data.shape
-        f[0].data = greyscale
+        if np.issubdtype(data.dtype, np.integer):
+            greyscale = np.round(greyscale)
+        f[0].data = greyscale.astype(data.dtype)
         for kw in ["BAYERPAT", "XBAYROFF", "YBAYROFF"]:
             if kw in f[0].header:
                 _ = f[0].header.pop(kw)
@@ -99,9 +101,9 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("GRATING", "Newport 270R", "Grating in use", after="FILTER") # TODO: make configurable
 
         f[0].header.set("OBJECT", request.object_name, "Target name", after="GRATING")
-        f[0].header.set("RA", tcs_status.ra, "[deg] Nominal right ascension", after="OBJECT")
-        f[0].header.set("DEC", tcs_status.dec, "[deg] Nominal declination", after="RA")
-        f[0].header.set("AIRMASS", tcs_status.airmass, "Airmass at end of observation", after="DEC")
+        f[0].header.set("RA", tcs_status.ra_str, "[deg] Nominal right ascension", after="OBJECT")
+        f[0].header.set("DEC", tcs_status.dec_str, "[deg] Nominal declination", after="RA")
+        f[0].header.set("AIRMASS", round(tcs_status.airmass, 3), "Airmass at end of observation", after="DEC")
         for axis in stages:
             f[0].header.set(axis.name.replace("_", "").upper().replace("FOCUS", "Z"), axis.position,
                             f"{axis.name.split('_')[1].capitalize()} stage position")
@@ -115,10 +117,11 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("MJD-OBS", round(date_obs.mjd, 6), "MJD start of observation", after="DATE-OBS")
         f[0].header.set("SIDEREAL", date_obs.sidereal_time("mean").to_string(sep=":", precision=1).zfill(10),
                         "Mean sidereal time at start of observation", after="MJD-OBS")
+        f[0].header.comments["EXPTIME"] = "[s] Exposure duration"
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
-        f[0].header.set("TECPOWER", system_status.science_camera.cooler_power_pct, "[%] Thermoelectric cooler power", after="CCD-TEMP")
+        f[0].header.set("TECPOWER", round(system_status.science_camera.cooler_power_pct, 1), "[%] Thermoelectric cooler power", after="CCD-TEMP")
         f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode")#, after="GAIN")
 
         now = Time.now()

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 from astropy.io import fits
+from astropy.coordinates import Angle
 
 from pydantic import BaseModel, Field
 
@@ -70,6 +71,15 @@ class TcsStatus(DeviceStatus):
     tracking: bool = False
     guiding: bool = False
 
+    @property
+    def ra_str(self) -> str:
+        ra_angle = Angle(self.ra, unit="deg")
+        return ra_angle.to_string(unit="hourangle", sep=":", precision=2, pad=True)
+
+    @property
+    def dec_str(self) -> str:
+        dec_angle = Angle(self.dec, unit="deg")
+        return dec_angle.to_string(unit="deg", sep=":", precision=1, pad=True, alwayssign=True)
 
 class ExposureRequest(BaseModel):
     exposure_s: float = Field(gt=0)
