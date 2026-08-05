@@ -1,1 +1,3 @@
 __pycache__/
+*.fits
+observing_log.jsonl

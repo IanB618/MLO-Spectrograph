@@ -1,0 +1,74 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+class Config:
+    def __init__(self):
+        load_dotenv()
+        self.secret_key = os.getenv("ICS_SECRET_KEY", "dev-only-change-me")
+        self.host = os.getenv("ICS_HOST", "0.0.0.0")
+        self.port = int(os.getenv("ICS_PORT", "5000"))
+        self.data_root = Path(os.getenv("ICS_DATA_ROOT", "./data")).resolve()
+        self.site_name = os.getenv("ICS_SITE_NAME", "Spectrograph ICS")
+        self.js9_asset_base = os.getenv("ICS_JS9_ASSET_BASE", "https://cdn.jsdelivr.net/npm/js9@3.9.0").rstrip("/")
+        self.indi_host = os.getenv("ICS_INDI_HOST", "127.0.0.1")
+        self.indi_port = int(os.getenv("ICS_INDI_PORT", "7624"))
+        self.indi_ccd_device = os.getenv("ICS_INDI_CCD_DEVICE", "FLI Kepler")
+        self.indi_focuser_device = os.getenv("ICS_INDI_FOCUSER_DEVICE", "Pinefeat CEF")
+        self.indi_blob_property = os.getenv("ICS_INDI_CCD_BLOB_PROPERTY", "CCD1")
+        self.indi_connect_timeout_s = float(os.getenv("ICS_INDI_CONNECT_TIMEOUT_S", "10"))
+        self.indi_command_timeout_s = float(os.getenv("ICS_INDI_COMMAND_TIMEOUT_S", "30"))
+        self.tcs_backend = os.getenv("ICS_TCS_BACKEND", "mock")
+        self.guide_camera_backend = os.getenv("ICS_GUIDE_CAMERA_BACKEND", "mock")
+        self.stage_backend = os.getenv("ICS_STAGE_BACKEND", "mock")
+        self.ace_host = os.getenv("ICS_ACE_HOST", "127.0.0.1")
+        self.ace_port = int(os.getenv("ICS_ACE_PORT", "9889"))
+        self.ace_node = os.getenv("ICS_ACE_NODE", "Telescope PC")
+        self.ace_telescope_name = os.getenv("ICS_ACE_TELESCOPE_NAME", "Telescope")
+        self.ace_guide_camera_node = os.getenv("ICS_ACE_GUIDE_CAMERA_NODE", self.ace_node)
+        self.ace_guide_camera_name = os.getenv("ICS_ACE_GUIDE_CAMERA_NAME", "Guide Camera")
+        self.ace_stage_node = os.getenv("ICS_ACE_STAGE_NODE", self.ace_node)
+        self.ace_stage_x_name = os.getenv("ICS_ACE_STAGE_X_NAME", "Guide Stage X")
+        self.ace_stage_y_name = os.getenv("ICS_ACE_STAGE_Y_NAME", "Guide Stage Y")
+        self.ace_stage_focus_name = os.getenv("ICS_ACE_STAGE_FOCUS_NAME", "")
+        self.ace_username = os.getenv("ICS_ACE_USERNAME") or None
+        self.ace_password = os.getenv("ICS_ACE_PASSWORD") or None
+
+    @staticmethod
+    def _optional_float(name: str) -> float | None:
+        value = os.getenv(name, "").strip()
+        return float(value) if value else None
+
+    def flask_config(self):
+        return {
+            "SECRET_KEY": self.secret_key,
+            "ICS_HOST": self.host,
+            "ICS_PORT": self.port,
+            "ICS_DATA_ROOT": self.data_root,
+            "ICS_SITE_NAME": self.site_name,
+            "ICS_JS9_ASSET_BASE": self.js9_asset_base,
+            "ICS_INDI_HOST": self.indi_host,
+            "ICS_INDI_PORT": self.indi_port,
+            "ICS_INDI_CCD_DEVICE": self.indi_ccd_device,
+            "ICS_INDI_FOCUSER_DEVICE": self.indi_focuser_device,
+            "ICS_INDI_CCD_BLOB_PROPERTY": self.indi_blob_property,
+            "ICS_INDI_CONNECT_TIMEOUT_S": self.indi_connect_timeout_s,
+            "ICS_INDI_COMMAND_TIMEOUT_S": self.indi_command_timeout_s,
+            "ICS_TCS_BACKEND": self.tcs_backend,
+            "ICS_GUIDE_CAMERA_BACKEND": self.guide_camera_backend,
+            "ICS_STAGE_BACKEND": self.stage_backend,
+            "ICS_ACE_HOST": self.ace_host,
+            "ICS_ACE_PORT": self.ace_port,
+            "ICS_ACE_NODE": self.ace_node,
+            "ICS_ACE_TELESCOPE_NAME": self.ace_telescope_name,
+            "ICS_ACE_GUIDE_CAMERA_NODE": self.ace_guide_camera_node,
+            "ICS_ACE_GUIDE_CAMERA_NAME": self.ace_guide_camera_name,
+            "ICS_ACE_STAGE_NODE": self.ace_stage_node,
+            "ICS_ACE_STAGE_X_NAME": self.ace_stage_x_name,
+            "ICS_ACE_STAGE_Y_NAME": self.ace_stage_y_name,
+            "ICS_ACE_STAGE_FOCUS_NAME": self.ace_stage_focus_name,
+            "ICS_ACE_USERNAME": self.ace_username,
+            "ICS_ACE_PASSWORD": self.ace_password,
+        }
