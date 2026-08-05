@@ -210,6 +210,13 @@ label select {
   grid-column: 1 / -1;
 }
 
+.lens-control-form {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  align-content: start;
+}
+
 .inline-form {
   display: grid;
   grid-template-columns: 1fr auto;

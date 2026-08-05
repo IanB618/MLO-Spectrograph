@@ -182,18 +182,21 @@
       </div>
     </div>
     <div id="lens-status" class="key-grid"></div>
-    <form id="lens-form" class="control-panel two-col-form">
-      <label>Absolute position <input name="position" type="number" step="1"></label>
-      <label>Relative delta <input name="delta" type="number" step="1" value="50"></label>
-      <div class="button-row span-form">
-        <button>Move lens</button>
-        <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
-      </div>
-    </form>
-    <form id="lens-aperture-absolute-form" class="inline-form">
-      <label>Absolute aperture, f/ <input name="f_stop" type="number" min="0" max="327.67" step="0.1" required></label>
-      <button>Set aperture</button>
-    </form>
+    <div class="control-panel two-col-form lens-control-grid">
+      <form id="lens-form" class="lens-control-form">
+        <label>Absolute position <input name="position" type="number" step="1" required></label>
+        <div class="button-row">
+          <button>Move lens</button>
+          <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
+        </div>
+      </form>
+      <form id="lens-aperture-absolute-form" class="lens-control-form">
+        <label>Absolute aperture, f/ <input name="f_stop" type="number" min="0" max="327.67" step="0.1" required></label>
+        <div class="button-row">
+          <button>Set aperture</button>
+        </div>
+      </form>
+    </div>
     <div id="lens-output" class="result-box muted">No lens focus action yet.</div>
   </article>
 

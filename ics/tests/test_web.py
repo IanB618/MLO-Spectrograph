@@ -103,6 +103,23 @@ def test_index_embeds_js9_and_full_width_science_card():
     assert 'class="card span-2 science-camera-card"' in html
 
 
+def test_lens_controls_place_aperture_beside_absolute_focus():
+    app = create_app()
+    app.config.update({"TESTING": True})
+    html = app.test_client().get("/").get_data(as_text=True)
+
+    lens_section = html.split("Camera Lens Focus / Pinefeat EF", 1)[1].split(
+        "Recent observation log", 1
+    )[0]
+    assert "Relative delta" not in lens_section
+    assert 'class="control-panel two-col-form lens-control-grid"' in lens_section
+    assert lens_section.index('id="lens-form"') < lens_section.index(
+        'id="lens-aperture-absolute-form"'
+    )
+    assert 'name="position"' in lens_section
+    assert 'name="f_stop"' in lens_section
+
+
 def test_latest_science_fits_returns_404_without_exposure():
     app = create_app()
     app.config.update({"TESTING": True})

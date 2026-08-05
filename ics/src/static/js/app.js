@@ -775,15 +775,14 @@ bindSubmit("motion-form", (event) => {
 
 bindSubmit("lens-form", (event) => {
   event.preventDefault();
-  const payload = numericFields(formPayload(event.target), ["position", "delta"]);
+  const payload = numericFields(formPayload(event.target), ["position"]);
   runAndRefresh(async () => {
     const result = await api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)});
-    const rows = payload.position !== undefined
-      ? {"Target position": payload.position}
-      : {"Relative move": `${payload.delta >= 0 ? "+" : ""}${payload.delta}`};
-    rows["Reported position"] = result.lens?.position ?? "--";
-    rows["State"] = result.lens?.state || "--";
-    renderResult("lens-output", "Lens focus move requested", rows);
+    renderResult("lens-output", "Lens focus move requested", {
+      "Target position": payload.position,
+      "Reported position": result.lens?.position ?? "--",
+      "State": result.lens?.state || "--",
+    });
   });
 });
 
