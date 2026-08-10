@@ -1,23 +1,19 @@
 from pathlib import Path
 
-<<<<<<< HEAD
 import numpy as np
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.io import fits
-=======
-from astropy.coordinates import SkyCoord, EarthLocation, AltAz
->>>>>>> e87a1108c48c0dbf58d6ae1a8a1d7e3a940138cc
 from astropy.time import Time
 from astropy import units as u
 
 from src.models import AxisStatus, CameraStatus, TcsStatus
-<<<<<<< HEAD
 from src.sim.simulator import ThroughputCurve, DetectorModel, SpectrographModel, InstrumentSimulator
 
 MLO = EarthLocation(lat=32.841*u.deg, lon=-116.427*u.deg, height=1860*u.m)
-# Repo-root data/csv files, independent of ICS_DATA_ROOT
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CSV_DIR = REPO_ROOT / "data" / "csv files"
+
 
 def build_default_simulator() -> InstrumentSimulator:
     fiber_wav, fiber_att = np.loadtxt(CSV_DIR / "fiber_attenuation.csv", delimiter=",").T
@@ -55,22 +51,15 @@ def build_default_simulator() -> InstrumentSimulator:
         detector=detector,
         throughputs=[fiber, misc_losses, collimator, filt, grating, window, qe],
     )
-=======
-
-MLO = EarthLocation(lat=32.841*u.deg, lon=-116.427*u.deg, height=1860*u.m)
 
 
->>>>>>> e87a1108c48c0dbf58d6ae1a8a1d7e3a940138cc
 class MockAcquisitionCamera:
     def __init__(self, data_root: Path):
         self.data_root = data_root
         self.connected = False
         self.last_preview_path = ""
-<<<<<<< HEAD
         self.simulator = build_default_simulator()
-=======
 
->>>>>>> e87a1108c48c0dbf58d6ae1a8a1d7e3a940138cc
     def connect(self):
         self.connected = True
 
@@ -90,8 +79,6 @@ class MockAcquisitionCamera:
         )
 
     def capture_preview(self, exposure_s: float = 0.2) -> str:
-<<<<<<< HEAD
-         # Placeholder flat continuum until a real target spectrum is wired in
         wave = np.linspace(3800, 9400, 2000)
         flux = np.full_like(wave, 1e-16)
 
@@ -102,12 +89,11 @@ class MockAcquisitionCamera:
             add_noise=True,
         )
         image_adu = np.round(image_adu).astype(np.uint16)
-=======
->>>>>>> e87a1108c48c0dbf58d6ae1a8a1d7e3a940138cc
+
         preview_dir = self.data_root / "previews"
         preview_dir.mkdir(parents=True, exist_ok=True)
-        path = preview_dir / "latest_guide_preview.txt"
-        path.write_text(f"Mock guide camera preview, exposure_s={exposure_s}\n", encoding="utf-8")
+        path = preview_dir / "latest_guide_preview.fits"
+        fits.writeto(path, image_adu, overwrite=True)
         self.last_preview_path = str(path)
         return self.last_preview_path
 
@@ -198,7 +184,7 @@ class MockTcs:
             obstime = Time(obstime)
         altaz_frame = AltAz(obstime=obstime, location=location)
         altaz = self.skycoord().transform_to(altaz_frame)
-        if altaz.alt.deg < 0 :
+        if altaz.alt.deg < 0:
             return float("inf")
         return float(altaz.secz)
 
