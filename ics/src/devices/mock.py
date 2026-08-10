@@ -1,18 +1,61 @@
 from pathlib import Path
 
+import numpy as np
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.io import fits
 from astropy.time import Time
 from astropy import units as u
 
 from src.models import AxisStatus, CameraStatus, TcsStatus
+from src.sim.simulator import ThroughputCurve, DetectorModel, SpectrographModel, InstrumentSimulator
 
 MLO = EarthLocation(lat=32.841*u.deg, lon=-116.427*u.deg, height=1860*u.m)
+# Repo-root data/csv files, independent of ICS_DATA_ROOT
+REPO_ROOT = Path(__file__).resolve().parents[3]
+CSV_DIR = REPO_ROOT / "data" / "csv files"
+
+def build_default_simulator() -> InstrumentSimulator:
+    fiber_wav, fiber_att = np.loadtxt(CSV_DIR / "fiber_attenuation.csv", delimiter=",").T
+    fiber_tx = 10 ** (-(fiber_att * (10. / 1000.)) / 10)
+    fiber = ThroughputCurve(fiber_wav * 10, fiber_tx, name="fiber")
+
+    misc_losses = ThroughputCurve(wavelength=np.array([3000, 10500]), throughput=np.array([0.94, 0.94]), name="misc.")
+    collimator = ThroughputCurve.from_csv(CSV_DIR / "thorlabs_ar_coating.csv", name="collimator")
+    filt = ThroughputCurve.from_csv(CSV_DIR / "FGL400S_transmission.csv", name="longpass filter")
+    grating = ThroughputCurve.from_csv(CSV_DIR / "master 1294 unpolarized.csv", name="grating")
+    qe = ThroughputCurve.from_csv(CSV_DIR / "gsense400bsi_qe.csv", name="detector QE")
+    window = ThroughputCurve.from_csv(CSV_DIR / "F101_coating.csv", name="detector window")
+
+    detector = DetectorModel(
+        nx=2048, ny=2048,
+        gain_e_per_adu=0.478,
+        read_noise_e=1.6,
+        dark_current_e_per_s=0.4,
+        bias_adu=200.0,
+        full_well_e=90000.0,
+    )
+
+    spectrograph = SpectrographModel(
+        central_wavelength=6263.304,
+        dispersion=3.4346,
+        x_center=(detector.nx - 1) / 2,
+        trace_y=(detector.ny - 1) / 2,
+        spectral_sigma_px=2.03,
+        spatial_sigma_px=2.25,
+        kernel_radius_sigma=4.0,
+    )
+
+    return InstrumentSimulator(
+        spectrograph=spectrograph,
+        detector=detector,
+        throughputs=[fiber, misc_losses, collimator, filt, grating, window, qe],
+    )
 class MockAcquisitionCamera:
     def __init__(self, data_root: Path):
         self.data_root = data_root
         self.connected = False
         self.last_preview_path = ""
-
+        self.simulator = build_default_simulator()
     def connect(self):
         self.connected = True
 
@@ -32,6 +75,17 @@ class MockAcquisitionCamera:
         )
 
     def capture_preview(self, exposure_s: float = 0.2) -> str:
+         # Placeholder flat continuum until a real target spectrum is wired in
+        wave = np.linspace(3800, 9400, 2000)
+        flux = np.full_like(wave, 1e-16)
+
+        image_adu = self.simulator.simulate(
+            wavelength=wave,
+            flux_density=flux,
+            exposure_s=exposure_s,
+            add_noise=True,
+        )
+        image_adu = np.round(image_adu).astype(np.uint16)
         preview_dir = self.data_root / "previews"
         preview_dir.mkdir(parents=True, exist_ok=True)
         path = preview_dir / "latest_guide_preview.txt"
