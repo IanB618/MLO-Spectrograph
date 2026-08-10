@@ -60,6 +60,11 @@ class InstrumentSupervisor:
             last_exposure=last_exposure,
         )
 
+    def latest_exposure(self) -> ExposureResult | None:
+        with self._state_lock:
+            result = self.last_exposure
+        return result.model_copy(deep=True) if result is not None else None
+
     def set_science_temperature(self, setpoint_c: float):
         self.devices.science_camera.set_temperature(setpoint_c)
         self._set_status(message=f"Science camera setpoint set to {setpoint_c:.1f} C")
@@ -103,6 +108,16 @@ class InstrumentSupervisor:
             self.devices.lens.calibrate()
             self._set_status(SystemState.IDLE, "Lens calibration started")
 
+    def set_lens_aperture_absolute(self, f_stop: float):
+        with self._operation_lock:
+            self.devices.lens.set_aperture_absolute(f_stop)
+            self._set_status(message=f"Lens aperture set to f/{f_stop:g}")
+
+    def set_lens_aperture_relative(self, delta: float):
+        with self._operation_lock:
+            self.devices.lens.set_aperture_relative(delta)
+            self._set_status(message=f"Lens aperture adjusted by {delta:+g}")
+
     def tcs_go_to_j2000(self, request: TcsGotoRequest):
         result = self.devices.tcs.go_to_j2000(request.ra_deg, request.dec_deg)
         self._set_status(message="TCS J2000 slew requested")
@@ -123,14 +138,15 @@ class InstrumentSupervisor:
             result: ExposureResult | None = None
             try:
                 result = self.devices.science_camera.expose(request)
-                with self._state_lock:
-                    self.last_exposure = result
-                self._set_status(SystemState.IDLE, result.message)
+                self._set_status(SystemState.EXPOSING, "Finalizing science exposure")
 
                 log_snapshot: SystemSnapshot | None = None
                 try:
-                    log_snapshot = self.snapshot()
+                    log_snapshot = self.snapshot().model_copy(update={"last_exposure": result})
                     self.data_manager.process_exposure(request, result, log_snapshot)
+                    with self._state_lock:
+                        self.last_exposure = result
+                    self._set_status(SystemState.IDLE, result.message)
                 except Exception as exc:
                     result.success = False
                     result.message = f"FITS saved, but exposure post-processing failed: {exc}"
@@ -187,18 +203,6 @@ class InstrumentSupervisor:
         # for the camera, and abort must remain callable from another request.
         self.devices.science_camera.abort()
         self._set_status(message="Exposure abort requested")
-
-    def run_focus_sweep_placeholder(self):
-        with self._operation_lock:
-            self._set_status(SystemState.FOCUSING, "Focus sweep placeholder complete")
-            self._set_status(SystemState.IDLE)
-            return {"best_position": self.devices.lens.status().position}
-
-    def center_target_placeholder(self):
-        with self._operation_lock:
-            self._set_status(SystemState.ACQUIRING, "Guide camera target centering placeholder complete")
-            self._set_status(SystemState.IDLE)
-            return {"dx_arcsec": 0.0, "dy_arcsec": 0.0}
 
     def run_calibration_placeholder(self):
         with self._operation_lock:

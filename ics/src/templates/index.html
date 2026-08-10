@@ -12,7 +12,7 @@
   </article>
   <article class="metric-card">
     <div class="metric-heading">
-      <span class="metric-label">Science camera</span>
+      <span id="science-camera-label" class="metric-label">Science camera</span>
       <span id="science-state-badge" class="badge badge-unknown">Loading</span>
     </div>
     <div id="science-summary" class="metric-main">--</div>
@@ -54,44 +54,64 @@
 </section>
 
 <section class="grid">
-  <article class="card">
-    <div class="card-header">
-      <div>
-        <h2>Science Camera / FLI Kepler</h2>
-        <p>Cooling, exposure setup, and current detector configuration.</p>
-      </div>
+  <article class="card span-2 science-camera-card">
+    <div class="science-camera-layout">
+      <section class="science-camera-controls">
+        <div class="card-header">
+          <div>
+            <h2 id="science-camera-title">Science Camera</h2>
+            <p>Cooling, exposure setup, and current detector configuration.</p>
+          </div>
+        </div>
+        <div id="science-camera-status" class="key-grid"></div>
+        <form id="temperature-form" class="inline-form">
+          <label>Setpoint, C <input name="setpoint_c" type="number" step="0.1" value="-20"></label>
+          <button>Set temperature</button>
+        </form>
+        <form id="exposure-form" class="control-panel two-col-form">
+          <label>Object <input name="object_name" value="Test Object"></label>
+          <label>Image type
+            <select name="image_type">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="bias">Bias</option>
+              <option value="flat">Flat</option>
+              <option value="arc">Arc</option>
+            </select>
+          </label>
+          <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="1.0"></label>
+          <label>Binning
+            <select name="binning">
+              <option value="1x1">1x1</option>
+              <option value="2x2">2x2</option>
+              <option value="4x4">4x4</option>
+            </select>
+          </label>
+          <label class="span-form">Comment <input name="comment"></label>
+          <div class="button-row span-form">
+            <button>Start exposure</button>
+            <button type="button" class="secondary" data-action="abort-exposure">Abort exposure</button>
+          </div>
+        </form>
+        <div id="science-camera-output" class="result-box muted">No science exposure completed yet.</div>
+      </section>
+
+      <section class="science-preview-panel" aria-labelledby="science-preview-title">
+        <div class="science-preview-header">
+          <div>
+            <h3 id="science-preview-title">Latest FITS preview</h3>
+            <p id="science-preview-status" class="science-preview-status">Waiting for JS9.</p>
+          </div>
+          <button type="button" class="secondary" data-action="reload-science-preview">Reload</button>
+        </div>
+        <div class="science-js9-shell">
+          <div class="JS9Menubar" id="scienceJS9Menubar" data-width="512px"></div>
+          <div class="JS9" id="scienceJS9" data-width="512px" data-height="512px"></div>
+          <div class="JS9Colorbar" id="scienceJS9Colorbar" data-width="512px"></div>
+          <div class="JS9Statusbar" id="scienceJS9Statusbar" data-width="512px"></div>
+        </div>
+      </section>
     </div>
-    <div id="science-camera-status" class="key-grid"></div>
-    <form id="temperature-form" class="inline-form">
-      <label>Setpoint, C <input name="setpoint_c" type="number" step="0.1" value="-20"></label>
-      <button>Set temperature</button>
-    </form>
-    <form id="exposure-form" class="control-panel two-col-form">
-      <label>Object <input name="object_name" value="Test Object"></label>
-      <label>Image type
-        <select name="image_type">
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="bias">Bias</option>
-          <option value="flat">Flat</option>
-          <option value="arc">Arc</option>
-        </select>
-      </label>
-      <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="1.0"></label>
-      <label>Binning
-        <select name="binning">
-          <option value="1x1">1x1</option>
-          <option value="2x2">2x2</option>
-          <option value="4x4">4x4</option>
-        </select>
-      </label>
-      <label class="span-form">Comment <input name="comment"></label>
-      <div class="button-row span-form">
-        <button>Start exposure</button>
-        <button type="button" class="secondary" data-action="abort-exposure">Abort exposure</button>
-      </div>
-    </form>
-    <div id="science-camera-output" class="result-box muted">No science exposure completed yet.</div>
   </article>
 
   <article class="card">
@@ -151,7 +171,6 @@
       <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="0.2"></label>
       <button>Capture preview</button>
     </form>
-    <button data-action="center-target">Center target placeholder</button>
     <div id="acq-output" class="result-box muted">No acquisition action yet.</div>
   </article>
 
@@ -163,15 +182,21 @@
       </div>
     </div>
     <div id="lens-status" class="key-grid"></div>
-    <form id="lens-form" class="control-panel two-col-form">
-      <label>Absolute position <input name="position" type="number" step="1"></label>
-      <label>Relative delta <input name="delta" type="number" step="1" value="50"></label>
-      <div class="button-row span-form">
-        <button>Move lens</button>
-        <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
-        <button type="button" class="secondary" data-action="focus-sweep">Focus sweep placeholder</button>
-      </div>
-    </form>
+    <div class="control-panel two-col-form lens-control-grid">
+      <form id="lens-form" class="lens-control-form">
+        <label>Absolute position <input name="position" type="number" step="1" required></label>
+        <div class="button-row">
+          <button>Move lens</button>
+          <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
+        </div>
+      </form>
+      <form id="lens-aperture-absolute-form" class="lens-control-form">
+        <label>Absolute aperture, f/ <input name="f_stop" type="number" min="0" max="327.67" step="0.1" required></label>
+        <div class="button-row">
+          <button>Set aperture</button>
+        </div>
+      </form>
+    </div>
     <div id="lens-output" class="result-box muted">No lens focus action yet.</div>
   </article>
 

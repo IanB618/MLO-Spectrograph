@@ -1,7 +1,8 @@
 import logging
 from http import HTTPStatus
+from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request, send_file
 from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
@@ -95,7 +96,9 @@ def create_app():
 
     @app.get("/")
     def index():
-        return render_template("index.html", site_name=app.config["ICS_SITE_NAME"])
+        return render_template("index.html",
+                               site_name=app.config["ICS_SITE_NAME"],
+                               js9_asset_base=app.config["ICS_JS9_ASSET_BASE"])
 
     @app.get("/api/status")
     def api_status():
@@ -128,15 +131,50 @@ def create_app():
         supervisor.abort_exposure()
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
+    @app.get("/api/science-camera/latest.fits")
+    def api_science_latest_fits():
+        result = supervisor.latest_exposure()
+        if result is None:
+            abort(404, description="No science exposure is available for preview.")
+
+        requested_exposure_id = request.args.get("exposure_id")
+        if requested_exposure_id and requested_exposure_id != result.exposure_id:
+            abort(409, description="The requested science exposure is no longer the latest completed exposure.")
+
+        path = Path(result.path).resolve()
+        data_root = Path(app.config["ICS_DATA_ROOT"]).resolve()
+        try:
+            path.relative_to(data_root)
+        except ValueError:
+            logger.error("Refusing to serve science preview outside data root: %s", path)
+            abort(404, description="The latest science exposure is not available for preview.")
+
+        if not path.is_file():
+            abort(404, description="The latest science FITS file does not exist.")
+
+        lower_name = path.name.lower()
+        if not lower_name.endswith((".fits", ".fit", ".fts", ".fits.gz", ".fit.gz", ".fts.gz", ".fz")):
+            abort(415, description="The latest science exposure is not a supported FITS file.")
+
+        response = send_file(
+            path,
+            mimetype="application/fits",
+            as_attachment=False,
+            download_name=path.name,
+            conditional=False,
+            etag=False,
+        )
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @app.post("/api/acquisition/preview")
     def api_acquisition_preview():
         payload = request.get_json(silent=True) or {}
         result = supervisor.capture_acquisition_preview(float(payload.get("exposure_s", 0.2)))
         return jsonify(result)
-
-    @app.post("/api/acquisition/center")
-    def api_acquisition_center():
-        return jsonify(supervisor.center_target_placeholder())
 
     @app.post("/api/motion/home")
     def api_motion_home():
@@ -156,13 +194,21 @@ def create_app():
         supervisor.move_lens(request_model)
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
-    @app.post("/api/lens/focus-sweep")
-    def api_lens_focus_sweep():
-        return jsonify(supervisor.run_focus_sweep_placeholder())
-
     @app.post("/api/lens/calibrate")
     def api_lens_calibrate():
         supervisor.calibrate_lens()
+        return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
+    @app.post("/api/lens/aperture/absolute")
+    def api_lens_aperture_absolute():
+        payload = request.get_json()
+        supervisor.set_lens_aperture_absolute(float(payload["f_stop"]))
+        return jsonify(supervisor.snapshot().model_dump(mode="json"))
+
+    @app.post("/api/lens/aperture/relative")
+    def api_lens_aperture_relative():
+        payload = request.get_json()
+        supervisor.set_lens_aperture_relative(float(payload["delta"]))
         return jsonify(supervisor.snapshot().model_dump(mode="json"))
 
     @app.post("/api/tcs/goto-j2000")

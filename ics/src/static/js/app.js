@@ -290,11 +290,302 @@ function renderResult(targetId, title, rows) {
   `;
 }
 
+const SCIENCE_JS9_DISPLAY_ID = "scienceJS9";
+const sciencePreviewState = {
+  ready: false,
+  latestExposure: null,
+  loadedExposureId: null,
+  loadingExposureId: null,
+  image: null,
+  loadTimer: null,
+  loadSequence: 0,
+  displayWidth: null,
+  displayHeight: null,
+  resizeObserver: null,
+  resizeFrame: null,
+};
+
+function setSciencePreviewStatus(message, tone = "muted") {
+  const target = document.getElementById("science-preview-status");
+  if (!target) {
+    return;
+  }
+  target.textContent = message;
+  target.dataset.tone = tone;
+}
+
+function scienceJs9DisplayExists() {
+  if (!window.JS9) {
+    return false;
+  }
+  try {
+    return Boolean(window.JS9.LookupDisplay(SCIENCE_JS9_DISPLAY_ID, false));
+  } catch (error) {
+    return false;
+  }
+}
+
+function scienceJs9PluginHeight(elementId) {
+  const element = document.getElementById(elementId);
+  return element ? Math.ceil(element.getBoundingClientRect().height) : 0;
+}
+
+function getScienceJs9TargetDimensions() {
+  const shell = document.querySelector(".science-js9-shell");
+  if (!shell) {
+    return null;
+  }
+
+  const style = window.getComputedStyle(shell);
+  const horizontalPadding =
+    Number.parseFloat(style.paddingLeft || "0") +
+    Number.parseFloat(style.paddingRight || "0");
+  const verticalPadding =
+    Number.parseFloat(style.paddingTop || "0") +
+    Number.parseFloat(style.paddingBottom || "0");
+
+  const width = Math.floor(shell.clientWidth - horizontalPadding);
+  const pluginHeight =
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Menubar`) +
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Colorbar`) +
+    scienceJs9PluginHeight(`${SCIENCE_JS9_DISPLAY_ID}Statusbar`);
+  const height = Math.floor(shell.clientHeight - verticalPadding - pluginHeight);
+
+  return {
+    width: Math.max(320, width),
+    height: Math.max(280, height),
+  };
+}
+
+function fitScienceJs9Image() {
+  if (!sciencePreviewState.image || !window.JS9) {
+    return;
+  }
+  try {
+    window.JS9.SetZoom("toFit", {display: sciencePreviewState.image});
+  } catch (error) {
+    console.error("Could not fit the JS9 science image", error);
+  }
+}
+
+function resizeScienceJs9({force = false} = {}) {
+  if (!sciencePreviewState.ready || !window.JS9) {
+    return;
+  }
+
+  const target = getScienceJs9TargetDimensions();
+  if (!target) {
+    return;
+  }
+
+  const widthChanged = Math.abs(target.width - (sciencePreviewState.displayWidth || 0)) >= 2;
+  const heightChanged = Math.abs(target.height - (sciencePreviewState.displayHeight || 0)) >= 2;
+  if (!force && !widthChanged && !heightChanged) {
+    return;
+  }
+
+  try {
+    window.JS9.ResizeDisplay(
+      SCIENCE_JS9_DISPLAY_ID,
+      target.width,
+      target.height,
+      {
+        resizeMenubar: true,
+        resizeColorbar: true,
+        resizeStatusbar: true,
+      },
+    );
+    sciencePreviewState.displayWidth = target.width;
+    sciencePreviewState.displayHeight = target.height;
+
+    window.requestAnimationFrame(() => {
+      fitScienceJs9Image();
+      // Menubar wrapping can change its height after a width update. A second
+      // pass converges on the remaining image height without creating a loop.
+      scheduleScienceJs9Resize();
+    });
+  } catch (error) {
+    console.error("Could not resize the JS9 science display", error);
+  }
+}
+
+function scheduleScienceJs9Resize() {
+  if (sciencePreviewState.resizeFrame !== null) {
+    window.cancelAnimationFrame(sciencePreviewState.resizeFrame);
+  }
+  sciencePreviewState.resizeFrame = window.requestAnimationFrame(() => {
+    sciencePreviewState.resizeFrame = null;
+    resizeScienceJs9();
+  });
+}
+
+function observeScienceJs9Size() {
+  const shell = document.querySelector(".science-js9-shell");
+  if (!shell) {
+    return;
+  }
+
+  if (window.ResizeObserver) {
+    sciencePreviewState.resizeObserver = new ResizeObserver(scheduleScienceJs9Resize);
+    sciencePreviewState.resizeObserver.observe(shell);
+  } else {
+    window.addEventListener("resize", scheduleScienceJs9Resize);
+  }
+}
+
+function markScienceJs9Ready() {
+  if (sciencePreviewState.ready || !scienceJs9DisplayExists()) {
+    return;
+  }
+  sciencePreviewState.ready = true;
+  resizeScienceJs9({force: true});
+  setSciencePreviewStatus("JS9 ready; no science exposure loaded.");
+  loadLatestSciencePreview();
+}
+
+function initializeScienceJs9() {
+  if (window.__js9LoadError || !window.JS9 || !window.jQuery) {
+    setSciencePreviewStatus(
+      "JS9 could not be loaded. Check network access or ICS_JS9_ASSET_BASE.",
+      "error",
+    );
+    return;
+  }
+
+  window.jQuery(document).on("JS9:ready", markScienceJs9Ready);
+  observeScienceJs9Size();
+  markScienceJs9Ready();
+
+  // JS9 normally becomes ready at DOM-ready time. This also covers pages where
+  // its ready event fired before this application handler was registered.
+  let attempts = 0;
+  const readyPoll = window.setInterval(() => {
+    attempts += 1;
+    markScienceJs9Ready();
+    if (sciencePreviewState.ready || attempts >= 40) {
+      window.clearInterval(readyPoll);
+      if (!sciencePreviewState.ready) {
+        setSciencePreviewStatus("JS9 did not initialize its science display.", "error");
+      }
+    }
+  }, 250);
+}
+
+function syncSciencePreview(exposure) {
+  sciencePreviewState.latestExposure = exposure || null;
+  if (!exposure) {
+    if (!sciencePreviewState.loadedExposureId && !sciencePreviewState.loadingExposureId) {
+      setSciencePreviewStatus(
+        sciencePreviewState.ready
+          ? "No completed science exposure is available."
+          : "Waiting for JS9 and a completed science exposure.",
+      );
+    }
+    return;
+  }
+
+  if (
+    exposure.exposure_id === sciencePreviewState.loadedExposureId ||
+    exposure.exposure_id === sciencePreviewState.loadingExposureId
+  ) {
+    return;
+  }
+  loadLatestSciencePreview();
+}
+
+function loadLatestSciencePreview({force = false} = {}) {
+  const exposure = sciencePreviewState.latestExposure;
+  if (!exposure) {
+    setSciencePreviewStatus("No completed science exposure is available.");
+    return;
+  }
+  if (!sciencePreviewState.ready) {
+    setSciencePreviewStatus(`Waiting for JS9 to display ${exposure.exposure_id}.`);
+    return;
+  }
+  if (!force && exposure.exposure_id === sciencePreviewState.loadedExposureId) {
+    return;
+  }
+
+  const exposureId = exposure.exposure_id;
+  const loadSequence = ++sciencePreviewState.loadSequence;
+  const imageId = `${exposureId}.fits`;
+  const refreshImage = sciencePreviewState.image;
+  const requestUrl = new URL("/api/science-camera/latest.fits", window.location.origin);
+  requestUrl.searchParams.set("exposure_id", exposureId);
+  requestUrl.searchParams.set("revision", `${exposureId}-${loadSequence}-${Date.now()}`);
+
+  sciencePreviewState.loadingExposureId = exposureId;
+  setSciencePreviewStatus(`Loading ${exposureId}...`);
+
+  if (sciencePreviewState.loadTimer) {
+    window.clearTimeout(sciencePreviewState.loadTimer);
+  }
+  sciencePreviewState.loadTimer = window.setTimeout(() => {
+    if (sciencePreviewState.loadSequence === loadSequence) {
+      sciencePreviewState.loadingExposureId = null;
+      setSciencePreviewStatus(`JS9 timed out while loading ${exposureId}.`, "error");
+    }
+  }, 60000);
+
+  try {
+    window.JS9.Load(
+      requestUrl.toString(),
+      {
+        id: imageId,
+        file: imageId,
+        scale: "linear",
+        colormap: "grey",
+        refresh: refreshImage || false,
+        onload: (image) => {
+          if (sciencePreviewState.loadSequence !== loadSequence) {
+            if (image && image !== sciencePreviewState.image) {
+              window.JS9.CloseImage({display: image});
+            }
+            return;
+          }
+          if (sciencePreviewState.loadTimer) {
+            window.clearTimeout(sciencePreviewState.loadTimer);
+            sciencePreviewState.loadTimer = null;
+          }
+
+          const previousImage = sciencePreviewState.image;
+          sciencePreviewState.image = image;
+          sciencePreviewState.loadedExposureId = exposureId;
+          sciencePreviewState.loadingExposureId = null;
+
+          window.JS9.SetColormap("grey", {display: image});
+          window.JS9.SetScale("zscale", {display: image});
+          resizeScienceJs9({force: true});
+          fitScienceJs9Image();
+          setSciencePreviewStatus(`Displaying ${exposureId}.`, "ready");
+
+          if (previousImage && previousImage !== image) {
+            window.JS9.CloseImage({display: previousImage});
+          }
+        },
+      },
+      {display: SCIENCE_JS9_DISPLAY_ID},
+    );
+  } catch (error) {
+    if (sciencePreviewState.loadTimer) {
+      window.clearTimeout(sciencePreviewState.loadTimer);
+      sciencePreviewState.loadTimer = null;
+    }
+    sciencePreviewState.loadingExposureId = null;
+    setSciencePreviewStatus(`Could not load FITS preview: ${error.message || error}`, "error");
+    console.error("JS9 FITS preview load failed", error);
+  }
+}
+
 function updateStatus(status) {
   setBadge("system-state-badge", stateBadge(status.state));
   setText("system-message", status.message || "--");
 
   const science = status.science_camera;
+  const scienceName = science.name || "Science camera";
+  setText("science-camera-label", scienceName);
+  setText("science-camera-title", `Science Camera / ${scienceName}`);
   setBadge("science-state-badge", deviceStateBadge(science));
   setText("science-summary", `${formatNumber(science.temperature_c, 1, " C")} / ${formatNumber(science.setpoint_c, 1, " C")}`);
   setText("science-note", `Cooler ${formatNumber(science.cooler_power_pct, 0, "%")}; ${science.exposing ? "exposing" : "not exposing"}`);
@@ -326,6 +617,8 @@ function updateStatus(status) {
     setText("last-exposure-note", "No science exposure recorded.");
   }
 
+  syncSciencePreview(status.last_exposure);
+
   renderKeyGrid("tcs-status", [
     ["Connection", tcs.connected ? "Connected" : "Offline"],
     ["Target", tcs.target_name || "--"],
@@ -335,6 +628,7 @@ function updateStatus(status) {
     ["Tracking / Guiding", `${formatBool(tcs.tracking)} / ${formatBool(tcs.guiding)}`],
   ]);
   renderKeyGrid("science-camera-status", [
+    ["Camera", scienceName],
     ["Connection", science.connected ? "Connected" : "Offline"],
     ["Temperature", formatNumber(science.temperature_c, 2, " C")],
     ["Setpoint", formatNumber(science.setpoint_c, 2, " C")],
@@ -381,6 +675,31 @@ async function runAndRefresh(task) {
   }
 }
 
+function bindSubmit(formId, handler) {
+  const form = document.getElementById(formId);
+  if (!form) {
+    console.warn(`Skipping submit handler for missing form #${formId}`);
+    return;
+  }
+  form.addEventListener("submit", handler);
+}
+
+async function initializePage() {
+  try {
+    await Promise.all([refreshStatus(), refreshLog()]);
+  } catch (error) {
+    setBadge("system-state-badge", stateBadge("error"));
+    setText("system-message", error.message || "Initial status request failed");
+    showError(error);
+  }
+}
+
+function poll(task) {
+  task().catch((error) => {
+    console.error("Periodic refresh failed", error);
+  });
+}
+
 document.addEventListener("click", (event) => {
   const action = event.target.dataset.action;
   if (!action) {
@@ -400,16 +719,13 @@ document.addEventListener("click", (event) => {
   if (action === "abort-exposure") {
     runAndRefresh(() => api("/api/science-camera/abort", {method: "POST"}));
   }
+  if (action === "reload-science-preview") {
+    loadLatestSciencePreview({force: true});
+  }
   if (action === "home-axis") {
     const form = document.getElementById("motion-form");
     const payload = formPayload(form);
     runAndRefresh(() => api("/api/motion/home", {method: "POST", body: JSON.stringify({axis: payload.axis})}));
-  }
-  if (action === "focus-sweep") {
-    runAndRefresh(async () => {
-      const result = await api("/api/lens/focus-sweep", {method: "POST"});
-      renderResult("lens-output", "Focus sweep result", {"Best position": result.best_position});
-    });
   }
   if (action === "calibrate-lens") {
     runAndRefresh(async () => {
@@ -419,21 +735,15 @@ document.addEventListener("click", (event) => {
       });
     });
   }
-  if (action === "center-target") {
-    runAndRefresh(async () => {
-      const result = await api("/api/acquisition/center", {method: "POST"});
-      renderResult("acq-output", "Centering result", {"Delta east": `${result.dx_arcsec} arcsec`, "Delta north": `${result.dy_arcsec} arcsec`});
-    });
-  }
 });
 
-document.getElementById("temperature-form").addEventListener("submit", (event) => {
+bindSubmit("temperature-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["setpoint_c"]);
   runAndRefresh(() => api("/api/science-camera/temperature", {method: "POST", body: JSON.stringify(payload)}));
 });
 
-document.getElementById("exposure-form").addEventListener("submit", (event) => {
+bindSubmit("exposure-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
@@ -444,10 +754,11 @@ document.getElementById("exposure-form").addEventListener("submit", (event) => {
       "Exposure": `${result.exposure_s} s`,
       "File": result.path,
     });
+    syncSciencePreview(result);
   });
 });
 
-document.getElementById("acq-preview-form").addEventListener("submit", (event) => {
+bindSubmit("acq-preview-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["exposure_s"]);
   runAndRefresh(async () => {
@@ -456,19 +767,50 @@ document.getElementById("acq-preview-form").addEventListener("submit", (event) =
   });
 });
 
-document.getElementById("motion-form").addEventListener("submit", (event) => {
+bindSubmit("motion-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["position", "delta"]);
   runAndRefresh(() => api("/api/motion/move", {method: "POST", body: JSON.stringify(payload)}));
 });
 
-document.getElementById("lens-form").addEventListener("submit", (event) => {
+bindSubmit("lens-form", (event) => {
   event.preventDefault();
-  const payload = numericFields(formPayload(event.target), ["position", "delta"]);
-  runAndRefresh(() => api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)}));
+  const payload = numericFields(formPayload(event.target), ["position"]);
+  runAndRefresh(async () => {
+    const result = await api("/api/lens/move", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("lens-output", "Lens focus move requested", {
+      "Target position": payload.position,
+      "Reported position": result.lens?.position ?? "--",
+      "State": result.lens?.state || "--",
+    });
+  });
 });
 
-document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {
+bindSubmit("lens-aperture-absolute-form", (event) => {
+  event.preventDefault();
+  const payload = numericFields(formPayload(event.target), ["f_stop"]);
+  runAndRefresh(async () => {
+    await api("/api/lens/aperture/absolute", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("lens-output", "Lens aperture set", {
+      "Aperture": `f/${formatNumber(payload.f_stop, 2)}`,
+      "INDI property": "ABS_APERTURE.APERTURE_ABSOLUTE",
+    });
+  });
+});
+
+bindSubmit("lens-aperture-relative-form", (event) => {
+  event.preventDefault();
+  const payload = numericFields(formPayload(event.target), ["delta"]);
+  runAndRefresh(async () => {
+    await api("/api/lens/aperture/relative", {method: "POST", body: JSON.stringify(payload)});
+    renderResult("lens-output", "Lens aperture adjusted", {
+      "Relative change": `${payload.delta >= 0 ? "+" : ""}${formatNumber(payload.delta, 2)}`,
+      "INDI property": "REL_APERTURE.APERTURE_RELATIVE",
+    });
+  });
+});
+
+bindSubmit("tcs-goto-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["ra_deg", "dec_deg"]);
   runAndRefresh(async () => {
@@ -481,7 +823,7 @@ document.getElementById("tcs-goto-form").addEventListener("submit", (event) => {
   });
 });
 
-document.getElementById("tcs-offset-form").addEventListener("submit", (event) => {
+bindSubmit("tcs-offset-form", (event) => {
   event.preventDefault();
   const payload = numericFields(formPayload(event.target), ["east_arcsec", "north_arcsec"]);
   runAndRefresh(async () => {
@@ -496,7 +838,7 @@ document.getElementById("tcs-offset-form").addEventListener("submit", (event) =>
   });
 });
 
-refreshStatus();
-refreshLog();
-setInterval(refreshStatus, 2000);
-setInterval(refreshLog, 10000);
+initializeScienceJs9();
+initializePage();
+setInterval(() => poll(refreshStatus), 2000);
+setInterval(() => poll(refreshLog), 10000);
