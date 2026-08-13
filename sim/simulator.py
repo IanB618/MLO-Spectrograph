@@ -138,15 +138,38 @@ class InstrumentSimulator:
         wavelength = np.asarray(wavelength, dtype=float)
         flux_density = np.asarray(flux_density, dtype=float)
 
-        if wavelength.ndim != 1 or flux_density.ndim != 1:
-            raise ValueError("wavelength and flux_density must be 1D arrays.")
+        if wavelength.ndim != 1:
+            raise ValueError("wavelength must be a 1D array.")
 
-        if wavelength.size != flux_density.size:
-            raise ValueError("wavelength and flux_density must have the same length.")
+        if flux_density.ndim == 1:
+            if self.spectrograph.fiber_count != 1:
+                raise ValueError(
+                    "flux_density must have shape (fiber_count, n_wavelength) "
+                    "when simulating multiple fibers."
+                )
+            flux_density = flux_density[np.newaxis, :]
+        elif flux_density.ndim != 2:
+            raise ValueError(
+                "flux_density must be a 1D array for one fiber or a 2D array "
+                "with shape (fiber_count, n_wavelength)."
+            )
+
+        if flux_density.shape[0] != self.spectrograph.fiber_count:
+            raise ValueError(
+                "flux_density must contain one spectrum per fiber: "
+                f"expected {self.spectrograph.fiber_count}, "
+                f"got {flux_density.shape[0]}."
+            )
+
+        if wavelength.size != flux_density.shape[1]:
+            raise ValueError(
+                "wavelength length must match the number of wavelength samples "
+                "in each input spectrum."
+            )
 
         order = np.argsort(wavelength)
         wavelength = wavelength[order]
-        flux_density = flux_density[order]
+        flux_density = flux_density[:, order]
 
         throughput = self.combined_throughput(wavelength)
 
@@ -171,8 +194,9 @@ class InstrumentSimulator:
 
         image = np.zeros((self.detector.ny, self.detector.nx), dtype=float)
 
-        for fiber_trace_y in (
-            self.spectrograph.fiber_trace_centers()
+        for fiber_trace_y, fiber_bin_electrons in zip(
+            self.spectrograph.fiber_trace_centers(),
+            bin_electrons,
         ):
             y_centers = (
                 self.spectrograph.wavelength_to_y(
@@ -186,7 +210,7 @@ class InstrumentSimulator:
                 image=image,
                 x_centers=x_centers,
                 y_centers=y_centers,
-                counts=bin_electrons,
+                counts=fiber_bin_electrons,
                 sigma_x=self.spectrograph.spectral_sigma_px,
                 sigma_y=self.spectrograph.spatial_sigma_px,
                 radius_sigma=self.spectrograph.kernel_radius_sigma,
