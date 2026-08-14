@@ -31,10 +31,20 @@
     <main>
       {% block content %}{% endblock %}
     </main>
+    <script>
+      // Suppress JS9's optional js9Prefs.json lookup. The CDN all-in-one
+      // bundle is self-contained and this app does not use a JS9 helper.
+      window.JS9Prefs = {
+        globalOpts: {
+          allinoneHelper: false,
+          helperType: "none",
+        },
+      };
+    </script>
     <script
       src="{{ js9_asset_base }}/js9-allinone.js"
       onerror="window.__js9LoadError = true"
     ></script>
-    <script src="{{ url_for('static', filename='js/app.js', v='20260804-js9-refresh-object') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v='20260814-js9-cdn-fix') }}"></script>
   </body>
 </html>

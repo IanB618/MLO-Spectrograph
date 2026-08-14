@@ -293,6 +293,7 @@ function renderResult(targetId, title, rows) {
 const SCIENCE_JS9_DISPLAY_ID = "scienceJS9";
 const sciencePreviewState = {
   ready: false,
+  loadError: false,
   latestExposure: null,
   loadedExposureId: null,
   loadingExposureId: null,
@@ -445,6 +446,7 @@ function markScienceJs9Ready() {
 
 function initializeScienceJs9() {
   if (window.__js9LoadError || !window.JS9 || !window.jQuery) {
+    sciencePreviewState.loadError = true;
     setSciencePreviewStatus(
       "JS9 could not be loaded. Check network access or ICS_JS9_ASSET_BASE.",
       "error",
@@ -465,6 +467,7 @@ function initializeScienceJs9() {
     if (sciencePreviewState.ready || attempts >= 40) {
       window.clearInterval(readyPoll);
       if (!sciencePreviewState.ready) {
+        sciencePreviewState.loadError = true;
         setSciencePreviewStatus("JS9 did not initialize its science display.", "error");
       }
     }
@@ -473,6 +476,9 @@ function initializeScienceJs9() {
 
 function syncSciencePreview(exposure) {
   sciencePreviewState.latestExposure = exposure || null;
+  if (sciencePreviewState.loadError) {
+    return;
+  }
   if (!exposure) {
     if (!sciencePreviewState.loadedExposureId && !sciencePreviewState.loadingExposureId) {
       setSciencePreviewStatus(
@@ -500,7 +506,9 @@ function loadLatestSciencePreview({force = false} = {}) {
     return;
   }
   if (!sciencePreviewState.ready) {
-    setSciencePreviewStatus(`Waiting for JS9 to display ${exposure.exposure_id}.`);
+    if (!sciencePreviewState.loadError) {
+      setSciencePreviewStatus(`Waiting for JS9 to display ${exposure.exposure_id}.`);
+    }
     return;
   }
   if (!force && exposure.exposure_id === sciencePreviewState.loadedExposureId) {

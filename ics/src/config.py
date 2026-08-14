@@ -12,7 +12,7 @@ class Config:
         self.port = int(os.getenv("ICS_PORT", "5000"))
         self.data_root = Path(os.getenv("ICS_DATA_ROOT", "./data")).resolve()
         self.site_name = os.getenv("ICS_SITE_NAME", "Spectrograph ICS")
-        self.js9_asset_base = os.getenv("ICS_JS9_ASSET_BASE", "https://cdn.jsdelivr.net/npm/js9@3.9.0").rstrip("/")
+        self.js9_asset_base = os.getenv("ICS_JS9_ASSET_BASE", "https://js9.sarhatabaot.net").rstrip("/")
         self.indi_host = os.getenv("ICS_INDI_HOST", "127.0.0.1")
         self.indi_port = int(os.getenv("ICS_INDI_PORT", "7624"))
         self.indi_ccd_device = os.getenv("ICS_INDI_CCD_DEVICE", "FLI Kepler")

@@ -103,7 +103,8 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("OBJECT", request.object_name, "Target name", after="GRATING")
         f[0].header.set("RA", tcs_status.ra_str, "[deg] Nominal right ascension", after="OBJECT")
         f[0].header.set("DEC", tcs_status.dec_str, "[deg] Nominal declination", after="RA")
-        f[0].header.set("AIRMASS", round(tcs_status.airmass, 3), "Airmass at end of observation", after="DEC")
+        airmass = round(tcs_status.airmass, 3) if tcs_status.airmass is not None else None
+        f[0].header.set("AIRMASS", airmass, "Airmass at end of observation", after="DEC")
         for axis in stages:
             f[0].header.set(axis.name.replace("_", "").upper().replace("FOCUS", "Z"), axis.position,
                             f"{axis.name.split('_')[1].capitalize()} stage position")
@@ -121,7 +122,10 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
-        f[0].header.set("TECPOWER", round(system_status.science_camera.cooler_power_pct, 1), "[%] Thermoelectric cooler power", after="CCD-TEMP")
+        tecpower = system_status.science_camera.cooler_power_pct
+        if tecpower is not None:
+            tecpower = round(tecpower, 1)
+        f[0].header.set("TECPOWER", tecpower, "[%] Thermoelectric cooler power", after="CCD-TEMP")
         f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode")#, after="GAIN")
 
         now = Time.now()
