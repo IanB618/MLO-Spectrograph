@@ -121,15 +121,15 @@ class MockTcs:
         altaz = self.skycoord().transform_to(altaz_frame)
         return altaz.alt, altaz.az
 
-    def get_airmass(self, obstime: Time | None = None, location: EarthLocation = MLO) -> float:
+    def get_airmass(self, obstime: Time | None = None, location: EarthLocation = MLO) -> float | None:
         if obstime is None:
             obstime = Time.now()
         elif not isinstance(obstime, Time):
             obstime = Time(obstime)
         altaz_frame = AltAz(obstime=obstime, location=location)
         altaz = self.skycoord().transform_to(altaz_frame)
-        if altaz.alt.deg < 0 :
-            return float("inf")
+        if altaz.alt.deg < 0:
+            return None
         return float(altaz.secz)
 
     def radec_str(self) -> tuple[str]:
