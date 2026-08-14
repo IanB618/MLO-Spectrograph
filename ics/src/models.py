@@ -58,6 +58,7 @@ class AxisStatus(BaseModel):
 
 class LensStatus(DeviceStatus):
     position: int = 0
+    aperture: float | None = None
     moving: bool = False
 
 

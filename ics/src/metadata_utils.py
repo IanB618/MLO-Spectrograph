@@ -112,6 +112,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("STAGEY", after="STAGEX")
         f[0].header.set("STAGEZ", after="STAGEY")
         f[0].header.set("CAMFOCUS", system_status.lens.position, "Camera lens focus position", after="STAGEZ")
+        f[0].header.set("CAMAPER", system_status.lens.aperture, "Camera lens aperture setting (f/)", after="CAMFOCUS")
         f[0].header.set("TELFOCUS", None, "Telescope focus position", before="CAMFOCUS") # TODO: tcs_status.focus_position
 
         date_obs = Time(f[0].header.get("DATE-OBS"), format="fits", location=MLO)
@@ -122,10 +123,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
-        tecpower = system_status.science_camera.cooler_power_pct
-        if tecpower is not None:
-            tecpower = round(tecpower, 1)
-        f[0].header.set("TECPOWER", tecpower, "[%] Thermoelectric cooler power", after="CCD-TEMP")
+        f[0].header.set("TECPOWER", round(system_status.science_camera.cooler_power_pct, 1), "[%] Thermoelectric cooler power", after="CCD-TEMP")
         f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode")#, after="GAIN")
 
         now = Time.now()
