@@ -390,6 +390,16 @@ code {
   min-width: 0;
 }
 
+.embedded-control-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.embedded-control-section .card-header {
+  margin-bottom: 0.85rem;
+}
+
 .science-preview-panel {
   min-width: 0;
   min-height: 0;

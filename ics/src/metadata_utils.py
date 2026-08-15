@@ -103,7 +103,8 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("OBJECT", request.object_name, "Target name", after="GRATING")
         f[0].header.set("RA", tcs_status.ra_str, "[deg] Nominal right ascension", after="OBJECT")
         f[0].header.set("DEC", tcs_status.dec_str, "[deg] Nominal declination", after="RA")
-        f[0].header.set("AIRMASS", round(tcs_status.airmass, 3), "Airmass at end of observation", after="DEC")
+        airmass = round(tcs_status.airmass, 3) if tcs_status.airmass is not None else None
+        f[0].header.set("AIRMASS", airmass, "Airmass at end of observation", after="DEC")
         for axis in stages:
             f[0].header.set(axis.name.replace("_", "").upper().replace("FOCUS", "Z"), axis.position,
                             f"{axis.name.split('_')[1].capitalize()} stage position")
@@ -111,6 +112,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("STAGEY", after="STAGEX")
         f[0].header.set("STAGEZ", after="STAGEY")
         f[0].header.set("CAMFOCUS", system_status.lens.position, "Camera lens focus position", after="STAGEZ")
+        f[0].header.set("CAMAPER", system_status.lens.aperture, "Camera lens aperture setting (f/)", after="CAMFOCUS")
         f[0].header.set("TELFOCUS", None, "Telescope focus position", before="CAMFOCUS") # TODO: tcs_status.focus_position
 
         date_obs = Time(f[0].header.get("DATE-OBS"), format="fits", location=MLO)

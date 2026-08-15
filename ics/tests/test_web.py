@@ -89,8 +89,11 @@ def test_index_embeds_js9_and_full_width_science_card():
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "js9-allinone.css" in html
-    assert "js9-allinone.js" in html
+    assert "https://js9.sarhatabaot.net/js9-allinone.css" in html
+    assert "https://js9.sarhatabaot.net/js9-allinone.js" in html
+    assert "window.JS9Prefs" in html
+    assert 'helperType: "none"' in html
+    assert html.index("window.JS9Prefs") < html.index("js9-allinone.js")
     assert "css/js9-dark.css" in html
     assert '<body class="ics-dark">' in html
     assert 'id="scienceJS9"' in html
@@ -195,7 +198,10 @@ def test_science_preview_uses_completed_result_and_refreshes_loaded_image():
     assert "const refreshImage = sciencePreviewState.image;" in app_js
     assert "refresh: refreshImage || false" in app_js
     assert "refresh: force" not in app_js
-    assert "20260804-js9-refresh-object" in base_html
+    assert "20260814-js9-cdn-fix" in base_html
+    assert "loadError: false" in app_js
+    assert "sciencePreviewState.loadError = true" in app_js
+    assert "if (sciencePreviewState.loadError)" in app_js
 
 
 

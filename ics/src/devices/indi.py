@@ -510,6 +510,7 @@ class IndiFocuser(IndiDeviceBase):
             return LensStatus(name=self.device_name, connected=False, ready=False, state="offline")
         client = self._require_client()
         position = self._read_position()
+        aperture = self._read_aperture()
         state = client.property_state(self.device_name, "ABS_FOCUS_POSITION")
         moving = state == "busy"
         return LensStatus(
@@ -518,6 +519,7 @@ class IndiFocuser(IndiDeviceBase):
             ready=not moving,
             state=state,
             position=position,
+            aperture=aperture,
             moving=moving,
         )
 
@@ -572,3 +574,11 @@ class IndiFocuser(IndiDeviceBase):
             return 0
         values = client.read_number(self.device_name, "ABS_FOCUS_POSITION")
         return int(values.get("FOCUS_ABSOLUTE_POSITION", next(iter(values.values()), 0)))
+
+    def _read_aperture(self) -> float | None:
+        client = self._require_client()
+        if client.get_property(self.device_name, "ABS_APERTURE") is None:
+            return None
+        values = client.read_number(self.device_name, "ABS_APERTURE")
+        value = values.get("APERTURE_ABSOLUTE", next(iter(values.values()), None))
+        return float(value) if value is not None else None

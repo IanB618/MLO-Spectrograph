@@ -79,7 +79,7 @@
               <option value="arc">Arc</option>
             </select>
           </label>
-          <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="1.0"></label>
+          <label>Exposure, s <input name="exposure_s" type="number" step="0.01" value="1.0"></label>
           <label>Binning
             <select name="binning">
               <option value="1x1">1x1</option>
@@ -94,6 +94,21 @@
           </div>
         </form>
         <div id="science-camera-output" class="result-box muted">No science exposure completed yet.</div>
+
+        <section class="embedded-control-section" aria-labelledby="acquisition-control-title">
+          <div class="card-header">
+            <div>
+              <h2 id="acquisition-control-title">Guide Camera / Acquisition</h2>
+              <p>Uses the existing telescope guide camera through ACE for preview and target-centering workflows.</p>
+            </div>
+          </div>
+          <div id="acquisition-camera-status" class="key-grid"></div>
+          <form id="acq-preview-form" class="inline-form">
+            <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="0.2"></label>
+            <button>Capture preview</button>
+          </form>
+          <div id="acq-output" class="result-box muted">No acquisition action yet.</div>
+        </section>
       </section>
 
       <section class="science-preview-panel" aria-labelledby="science-preview-title">
@@ -110,6 +125,32 @@
           <div class="JS9Colorbar" id="scienceJS9Colorbar" data-width="512px"></div>
           <div class="JS9Statusbar" id="scienceJS9Statusbar" data-width="512px"></div>
         </div>
+
+        <section class="embedded-control-section" aria-labelledby="lens-control-title">
+          <div class="card-header">
+            <div>
+              <h2 id="lens-control-title">Camera Lens Focus / Pinefeat EF</h2>
+              <p>Instrument-side camera-lens focus position.</p>
+            </div>
+          </div>
+          <div id="lens-status" class="key-grid"></div>
+          <div class="control-panel two-col-form lens-control-grid">
+            <form id="lens-form" class="lens-control-form">
+              <label>Absolute position <input name="position" type="number" step="1" required></label>
+              <div class="button-row">
+                <button>Move lens</button>
+                <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
+              </div>
+            </form>
+            <form id="lens-aperture-absolute-form" class="lens-control-form">
+              <label>Absolute aperture, f/ <input name="f_stop" type="number" min="0" max="327.67" step="0.1" required></label>
+              <div class="button-row">
+                <button>Set aperture</button>
+              </div>
+            </form>
+          </div>
+          <div id="lens-output" class="result-box muted">No lens focus action yet.</div>
+        </section>
       </section>
     </div>
   </article>
@@ -157,47 +198,6 @@
         <button type="button" class="secondary" data-action="home-axis">Home selected axis</button>
       </div>
     </form>
-  </article>
-
-  <article class="card">
-    <div class="card-header">
-      <div>
-        <h2>Guide Camera / Acquisition</h2>
-        <p>Uses the existing telescope guide camera through ACE for preview and target-centering workflows.</p>
-      </div>
-    </div>
-    <div id="acquisition-camera-status" class="key-grid"></div>
-    <form id="acq-preview-form" class="inline-form">
-      <label>Exposure, s <input name="exposure_s" type="number" step="0.1" value="0.2"></label>
-      <button>Capture preview</button>
-    </form>
-    <div id="acq-output" class="result-box muted">No acquisition action yet.</div>
-  </article>
-
-  <article class="card">
-    <div class="card-header">
-      <div>
-        <h2>Camera Lens Focus / Pinefeat EF</h2>
-        <p>Instrument-side camera-lens focus position.</p>
-      </div>
-    </div>
-    <div id="lens-status" class="key-grid"></div>
-    <div class="control-panel two-col-form lens-control-grid">
-      <form id="lens-form" class="lens-control-form">
-        <label>Absolute position <input name="position" type="number" step="1" required></label>
-        <div class="button-row">
-          <button>Move lens</button>
-          <button type="button" class="secondary" data-action="calibrate-lens">Calibrate</button>
-        </div>
-      </form>
-      <form id="lens-aperture-absolute-form" class="lens-control-form">
-        <label>Absolute aperture, f/ <input name="f_stop" type="number" min="0" max="327.67" step="0.1" required></label>
-        <div class="button-row">
-          <button>Set aperture</button>
-        </div>
-      </form>
-    </div>
-    <div id="lens-output" class="result-box muted">No lens focus action yet.</div>
   </article>
 
   <article class="card span-2">
