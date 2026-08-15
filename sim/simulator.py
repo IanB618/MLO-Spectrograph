@@ -52,6 +52,7 @@ class SpectrographModel:
     spectral_sigma_px: float = 2.03
     spatial_sigma_px: float = 2.25
     kernel_radius_sigma: float = 4.0
+    render_sampling_px: float = 0.5
 
     trace_func: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
 
@@ -138,19 +139,46 @@ class InstrumentSimulator:
         wavelength = np.asarray(wavelength, dtype=float)
         flux_density = np.asarray(flux_density, dtype=float)
 
-        if wavelength.ndim != 1 or flux_density.ndim != 1:
-            raise ValueError("wavelength and flux_density must be 1D arrays.")
+        if wavelength.ndim != 1:
+            raise ValueError("wavelength must be a 1D array.")
 
-        if wavelength.size != flux_density.size:
-            raise ValueError("wavelength and flux_density must have the same length.")
+        if flux_density.ndim == 1:
+            if self.spectrograph.fiber_count != 1:
+                raise ValueError(
+                    "flux_density must have shape (fiber_count, n_wavelength) "
+                    "when simulating multiple fibers."
+                )
+            flux_density = flux_density[np.newaxis, :]
+        elif flux_density.ndim != 2:
+            raise ValueError(
+                "flux_density must be a 1D array for one fiber or a 2D array "
+                "with shape (fiber_count, n_wavelength)."
+            )
+
+        if flux_density.shape[0] != self.spectrograph.fiber_count:
+            raise ValueError(
+                "flux_density must contain one spectrum per fiber: "
+                f"expected {self.spectrograph.fiber_count}, "
+                f"got {flux_density.shape[0]}."
+            )
+
+        if wavelength.size != flux_density.shape[1]:
+            raise ValueError(
+                "wavelength length must match the number of wavelength samples "
+                "in each input spectrum."
+            )
 
         order = np.argsort(wavelength)
         wavelength = wavelength[order]
-        flux_density = flux_density[order]
+        flux_density = flux_density[:, order]
+
+        wavelength, flux_density = self._resample_for_detector(
+            wavelength,
+            flux_density,
+        )
 
         throughput = self.combined_throughput(wavelength)
-
-        d_wavelength = np.abs(np.gradient(wavelength))
+        d_wavelength = self._trapezoid_bin_widths(wavelength)
 
         wavelength_cm = wavelength * 1e-8
         photon_energy_erg = H_ERG_S * C_CM_S / wavelength_cm
@@ -171,8 +199,9 @@ class InstrumentSimulator:
 
         image = np.zeros((self.detector.ny, self.detector.nx), dtype=float)
 
-        for fiber_trace_y in (
-            self.spectrograph.fiber_trace_centers()
+        for fiber_trace_y, fiber_bin_electrons in zip(
+            self.spectrograph.fiber_trace_centers(),
+            bin_electrons,
         ):
             y_centers = (
                 self.spectrograph.wavelength_to_y(
@@ -186,7 +215,7 @@ class InstrumentSimulator:
                 image=image,
                 x_centers=x_centers,
                 y_centers=y_centers,
-                counts=bin_electrons,
+                counts=fiber_bin_electrons,
                 sigma_x=self.spectrograph.spectral_sigma_px,
                 sigma_y=self.spectrograph.spatial_sigma_px,
                 radius_sigma=self.spectrograph.kernel_radius_sigma,
@@ -194,6 +223,58 @@ class InstrumentSimulator:
 
         image = self._apply_vignetting(image, vignetting)
         return image
+
+
+    def _resample_for_detector(
+        self,
+        wavelength: np.ndarray,
+        flux_density: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        if wavelength.size < 2:
+            raise ValueError("At least two wavelength samples are required.")
+
+        wavelength_steps = np.diff(wavelength)
+        if np.any(wavelength_steps <= 0):
+            raise ValueError("wavelength samples must be unique.")
+
+        target_step = (
+            abs(self.spectrograph.dispersion)
+            * self.spectrograph.render_sampling_px
+        )
+        if target_step <= 0:
+            raise ValueError("render_sampling_px and dispersion must be non-zero.")
+
+        if np.all(wavelength_steps <= target_step):
+            return wavelength, flux_density
+
+        span = wavelength[-1] - wavelength[0]
+        uniform_count = int(np.ceil(span / target_step)) + 1
+        uniform_wavelength = np.linspace(
+            wavelength[0],
+            wavelength[-1],
+            uniform_count,
+        )
+
+        # Keep the original wavelength samples as interpolation breakpoints.
+        # This preserves the piecewise-linear input spectrum while adding enough
+        # samples to render it smoothly on the detector.
+        render_wavelength = np.unique(
+            np.concatenate((wavelength, uniform_wavelength))
+        )
+        render_flux_density = np.vstack([
+            np.interp(render_wavelength, wavelength, spectrum)
+            for spectrum in flux_density
+        ])
+
+        return render_wavelength, render_flux_density
+
+    @staticmethod
+    def _trapezoid_bin_widths(wavelength: np.ndarray) -> np.ndarray:
+        widths = np.empty_like(wavelength, dtype=float)
+        widths[0] = 0.5 * (wavelength[1] - wavelength[0])
+        widths[-1] = 0.5 * (wavelength[-1] - wavelength[-2])
+        widths[1:-1] = 0.5 * (wavelength[2:] - wavelength[:-2])
+        return widths
 
     def simulate(
         self,
