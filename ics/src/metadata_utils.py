@@ -92,7 +92,7 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("LATITUDE", round(MLO.lat.deg, 3), "[deg] Location latitude", after="LOCATION")
         f[0].header.set("LONGITUD", round(MLO.lon.deg, 3), "[deg] Location longitude", after="LATITUDE")
         f[0].header.set("TELESCOP", "Claud 1.25-m Telescope", "Telescope name", after="LONGITUD")
-        camera = system_status.science_camera.name or f[0].header.get("INSTRUME", None)
+        camera = system_status.science_camera.name or f[0].header.get("INSTRUME", "")
         if "SBIG" in camera:
             f[0].data = f[0].data[:, ::-1] # X is flipped for SBIG camera
         f[0].header.set("INSTRUME", "Fiber-Fed Spectrograph", "Instrument name", after="TELESCOP")
@@ -124,7 +124,13 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
         f[0].header.set("TECPOWER", round(system_status.science_camera.cooler_power_pct, 1), "[%] Thermoelectric cooler power", after="CCD-TEMP")
-        f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode")#, after="GAIN")
+        if "GAIN" in f[0].header:
+            pass
+        elif "SBIG" in camera:
+            f[0].header.set("GAIN", 0.37, "[e-/ADU] Camera gain")
+        else:
+            f[0].header.set("GAIN", None, "[e-/ADU] Camera gain")
+        f[0].header.set("GAINMODE", system_status.science_camera.gain_mode, "Gain mode", after="GAIN")
 
         now = Time.now()
         f[0].header.set("DATE", now.isot, "Time HDU was created/modified")
