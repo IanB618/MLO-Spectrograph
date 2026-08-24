@@ -3,11 +3,13 @@
 import argparse
 from pathlib import Path
 
-from spectrograph_pipeline.detector import read_l0_ccd, read_master_ccd
-from spectrograph_pipeline.geometry import evenly_spaced_centers, infer_half_width, parse_centers
-from spectrograph_pipeline.io import write_l1_fits
-from spectrograph_pipeline.l1 import process_l1
-from spectrograph_pipeline.l2 import process_l2
+import numpy as np
+from astropy.nddata import CCDData
+
+from l1.io import write_l1_fits
+from l1.utils import infer_half_width
+from l1 import process_l1
+from l2 import process_l2
 
 
 def _extension(value: str) -> str | int:
@@ -136,29 +138,31 @@ def _get_centers(args: argparse.Namespace):
     if args.centers is not None:
         if args.center is not None or args.spacing is not None:
             raise ValueError("use either --centers or --center/--spacing, not both")
-        return parse_centers(args.centers)
+        try:
+            centers = np.asarray(map(float, args.centers.split(",")), dtype=float)
+        except ValueError as exc:
+            raise ValueError("trace centers must be comma-separated numbers") from exc
+
+        if centers.size == 0 or not np.all(np.isfinite(centers)):
+            raise ValueError("trace centers must contain finite values")
+        return centers
 
     if args.center is None or args.spacing is None:
         raise ValueError("provide --centers or both --center and --spacing")
 
-    return evenly_spaced_centers(args.center, args.spacing, args.n_traces)
+    offsets = np.arange(args.n_traces, dtype=float) - (args.n_traces - 1) / 2
+    return args.center + args.spacing * offsets
 
 
 def _read_optional_master(path, data_ext, default_unit):
     if path is None:
         return None
-    return read_master_ccd(path, data_ext=data_ext, default_unit=default_unit)
+    return CCDData.read(path, hdu=data_ext, unit=default_unit)
 
 
 def _run_l1(args: argparse.Namespace) -> None:
     centers = _get_centers(args)
-    ccd = read_l0_ccd(
-        args.input,
-        data_ext=args.data_ext,
-        variance_ext=args.variance_ext,
-        mask_ext=args.mask_ext,
-        unit=args.unit,
-    )
+    ccd = CCDData.read(args.input, hdu=args.data_ext, unit=args.unit)
 
     bias = _read_optional_master(args.bias, args.cal_data_ext, ccd.unit)
     dark = _read_optional_master(args.dark, args.cal_data_ext, ccd.unit)
