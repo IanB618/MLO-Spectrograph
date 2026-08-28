@@ -96,6 +96,22 @@ main {
   margin-bottom: 0;
 }
 
+.metric-heading-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.metric-device-select {
+  width: auto;
+  max-width: 9rem;
+  min-width: 5rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+}
+
 .metric-main {
   font-size: 1.15rem;
   font-weight: 700;

@@ -13,7 +13,12 @@
   <article class="metric-card">
     <div class="metric-heading">
       <span id="science-camera-label" class="metric-label">Science camera</span>
-      <span id="science-state-badge" class="badge badge-unknown">Loading</span>
+      <div class="metric-heading-controls">
+        <select id="indi-science-camera" class="metric-device-select" aria-label="Science camera INDI device">
+          <option value="{{ indi_science_camera }}">{{ indi_science_camera }}</option>
+        </select>
+        <span id="science-state-badge" class="badge badge-unknown">Loading</span>
+      </div>
     </div>
     <div id="science-summary" class="metric-main">--</div>
     <span id="science-note" class="metric-note">--</span>
@@ -40,7 +45,12 @@
   <article class="metric-card">
     <div class="metric-heading">
       <span class="metric-label">Lens focus</span>
-      <span id="lens-state-badge" class="badge badge-unknown">Loading</span>
+      <div class="metric-heading-controls">
+        <select id="indi-lens" class="metric-device-select" aria-label="Lens / focuser INDI device">
+          <option value="{{ indi_lens }}">{{ indi_lens }}</option>
+        </select>
+        <span id="lens-state-badge" class="badge badge-unknown">Loading</span>
+      </div>
     </div>
     <div id="lens-summary" class="metric-main">--</div>
     <span id="lens-note" class="metric-note">--</span>
@@ -54,33 +64,6 @@
 </section>
 
 <section class="grid">
-  <article class="card span-2">
-    <div class="card-header">
-      <div>
-        <h2>INDI Devices</h2>
-        <p>Select the science camera and camera-lens controller used by the running ICS.</p>
-      </div>
-    </div>
-    <form id="indi-devices-form" class="control-panel two-col-form">
-      <label>Science camera
-        <select id="indi-science-camera" name="science_camera">
-          <option value="{{ indi_science_camera }}">{{ indi_science_camera }}</option>
-        </select>
-      </label>
-      <label>Lens / focuser
-        <select id="indi-lens" name="lens">
-          <option value="{{ indi_lens }}">{{ indi_lens }}</option>
-        </select>
-      </label>
-      <div class="button-row span-form">
-        <button>Apply devices</button>
-        <button type="button" class="secondary" data-action="refresh-indi-devices">Refresh device list</button>
-      </div>
-      <p id="indi-device-message" class="form-note span-form">
-        Current runtime selection shown above. Refresh to discover devices currently advertised by indiserver.
-      </p>
-    </form>
-  </article>
   <article class="card span-2 science-camera-card">
     <div class="science-camera-layout">
       <section class="science-camera-controls">

@@ -104,8 +104,9 @@ def test_index_embeds_js9_and_full_width_science_card():
     assert "background-color: transparent !important;" in js9_dark_css
     assert "These containers must remain transparent" in js9_dark_css
     assert 'class="card span-2 science-camera-card"' in html
-    assert 'id="indi-devices-form"' in html
-    assert 'data-action="refresh-indi-devices"' in html
+    assert 'id="indi-science-camera" class="metric-device-select"' in html
+    assert 'id="indi-lens" class="metric-device-select"' in html
+    assert 'id="indi-devices-form"' not in html
 
 
 def test_lens_controls_place_aperture_beside_absolute_focus():

@@ -291,11 +291,23 @@ function updateIndiDeviceSelectors(payload) {
 async function refreshIndiDevices() {
   const payload = await api("/api/indi/devices");
   updateIndiDeviceSelectors(payload);
-  const count = payload.devices?.length || 0;
-  setText(
-    "indi-device-message",
-    count === 1 ? "Discovered 1 INDI device." : `Discovered ${count} INDI devices.`,
-  );
+  return payload;
+}
+
+async function selectIndiDevices() {
+  const scienceCamera = document.getElementById("indi-science-camera");
+  const lens = document.getElementById("indi-lens");
+  if (!scienceCamera || !lens) {
+    return;
+  }
+
+  await api("/api/indi/devices", {
+    method: "POST",
+    body: JSON.stringify({
+      science_camera: scienceCamera.value,
+      lens: lens.value,
+    }),
+  });
 }
 
 function renderLog(log) {
@@ -750,6 +762,9 @@ function bindSubmit(formId, handler) {
 async function initializePage() {
   try {
     await Promise.all([refreshStatus(), refreshLog()]);
+    refreshIndiDevices().catch((error) => {
+      console.warn("INDI device discovery failed", error);
+    });
   } catch (error) {
     setBadge("system-state-badge", stateBadge("error"));
     setText("system-message", error.message || "Initial status request failed");
@@ -782,10 +797,6 @@ document.addEventListener("click", (event) => {
   if (action === "abort-exposure") {
     runAndRefresh(() => api("/api/science-camera/abort", {method: "POST"}));
   }
-  if (action === "refresh-indi-devices") {
-    hideError();
-    refreshIndiDevices().catch(showError);
-  }
   if (action === "reload-science-preview") {
     loadLatestSciencePreview({force: true});
   }
@@ -804,20 +815,16 @@ document.addEventListener("click", (event) => {
   }
 });
 
-bindSubmit("indi-devices-form", (event) => {
-  event.preventDefault();
-  const payload = formPayload(event.target);
-  runAndRefresh(async () => {
-    const result = await api("/api/indi/devices", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    setText(
-      "indi-device-message",
-      `Using ${result.selected.science_camera} and ${result.selected.lens} for this ICS session.`,
-    );
+for (const selectId of ["indi-science-camera", "indi-lens"]) {
+  const select = document.getElementById(selectId);
+  if (!select) {
+    continue;
+  }
+  select.addEventListener("change", () => {
+    hideError();
+    runAndRefresh(selectIndiDevices);
   });
-});
+}
 
 bindSubmit("temperature-form", (event) => {
   event.preventDefault();
