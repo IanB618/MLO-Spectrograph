@@ -98,6 +98,24 @@ class IndiClient(PyIndi.BaseClient):
     def wait_for_device(self, device_name: str, timeout_s: float):
         return self._wait_until(lambda: self.get_device(device_name), timeout_s, f"INDI device '{device_name}'")
 
+    def wait_for_devices(self, timeout_s: float, settle_s: float = 0.35):
+        deadline = time.monotonic() + timeout_s
+        last_names: tuple[str, ...] = ()
+        stable_since = None
+        with self._condition:
+            while time.monotonic() < deadline:
+                devices = list(self.getDevices())
+                names = tuple(sorted(device.getDeviceName() for device in devices))
+                now = time.monotonic()
+                if names:
+                    if names != last_names:
+                        last_names = names
+                        stable_since = now
+                    elif stable_since is not None and now - stable_since >= settle_s:
+                        return devices
+                self._condition.wait(timeout=0.1)
+        return list(self.getDevices())
+
     def wait_for_property(self, device_name: str, property_name: str, timeout_s: float):
         return self._wait_until(
             lambda: self.get_property(device_name, property_name),
@@ -309,9 +327,14 @@ class IndiDeviceBase:
             if self.connected:
                 return
             self.client = IndiClient()
-            self.client.connect(self.host, self.port, self.connect_timeout_s)
-            self.client.wait_for_device(self.device_name, self.connect_timeout_s)
-            self._connect_driver_if_supported()
+            try:
+                self.client.connect(self.host, self.port, self.connect_timeout_s)
+                self.client.wait_for_device(self.device_name, self.connect_timeout_s)
+                self._connect_driver_if_supported()
+            except Exception:
+                self.client.disconnect()
+                self.client = None
+                raise
 
     def disconnect(self):
         with self._lock:
@@ -319,6 +342,37 @@ class IndiDeviceBase:
                 self._disconnect_driver_if_supported()
                 self.client.disconnect()
                 self.client = None
+
+    def set_device_name(self, device_name: str):
+        device_name = device_name.strip()
+        if not device_name:
+            raise ValueError("INDI device name cannot be blank")
+        if device_name == self.device_name:
+            return
+
+        old_device_name = self.device_name
+        was_connected = self.connected
+        if self.client is not None:
+            self.disconnect()
+
+        self.device_name = device_name
+        self._device_name_changed()
+        if not was_connected:
+            return
+
+        try:
+            self.connect()
+        except Exception:
+            self.device_name = old_device_name
+            self._device_name_changed()
+            try:
+                self.connect()
+            except Exception:
+                logger.exception("Could not reconnect original INDI device %s after failed rebind", old_device_name)
+            raise
+
+    def _device_name_changed(self):
+        pass
 
     def _require_client(self) -> IndiClient:
         if self.client is None or not self.client.is_connected:
@@ -368,6 +422,10 @@ class IndiCcdCamera(IndiDeviceBase):
         client = self._require_client()
         client.request_blobs(self.device_name, self.blob_property)
         self._refresh_published_name()
+
+    def _device_name_changed(self):
+        self._published_name = self.device_name
+        self._temperature_setpoint_c = None
 
     def status(self) -> CameraStatus:
         if not self.connected:
@@ -582,3 +640,45 @@ class IndiFocuser(IndiDeviceBase):
         values = client.read_number(self.device_name, "ABS_APERTURE")
         value = values.get("APERTURE_ABSOLUTE", next(iter(values.values()), None))
         return float(value) if value is not None else None
+
+
+def discover_indi_devices(host: str, port: int, timeout_s: float) -> list[dict[str, object]]:
+    client = IndiClient()
+    try:
+        client.connect(host, port, timeout_s)
+        devices = client.wait_for_devices(timeout_s)
+        discovered = []
+        for device in devices:
+            name = device.getDeviceName()
+            property_names = {prop.getName() for prop in device.getProperties()}
+            interface = _read_driver_interface(client, name)
+            discovered.append(
+                {
+                    "name": name,
+                    "camera": _has_interface(interface, "CCD_INTERFACE", 2)
+                    or bool(property_names & {"CCD_EXPOSURE", "CCD_INFO", "CCD1"}),
+                    "focuser": _has_interface(interface, "FOCUSER_INTERFACE", 8)
+                    or bool(property_names & {"ABS_FOCUS_POSITION", "REL_FOCUS_POSITION", "FOCUS_MOTION"}),
+                }
+            )
+        return sorted(discovered, key=lambda item: str(item["name"]).lower())
+    finally:
+        client.disconnect()
+
+
+def _read_driver_interface(client: IndiClient, device_name: str) -> int | None:
+    if client.get_property(device_name, "DRIVER_INFO") is None:
+        return None
+    try:
+        values = client.read_text(device_name, "DRIVER_INFO")
+        value = values.get("DRIVER_INTERFACE")
+        return int(float(value)) if value not in (None, "") else None
+    except (TypeError, ValueError, TimeoutError):
+        return None
+
+
+def _has_interface(interface: int | None, constant_name: str, fallback: int) -> bool:
+    if interface is None:
+        return False
+    interface_flag = int(getattr(PyIndi, constant_name, fallback))
+    return bool(interface & interface_flag)

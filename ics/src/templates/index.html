@@ -54,6 +54,33 @@
 </section>
 
 <section class="grid">
+  <article class="card span-2">
+    <div class="card-header">
+      <div>
+        <h2>INDI Devices</h2>
+        <p>Select the science camera and camera-lens controller used by the running ICS.</p>
+      </div>
+    </div>
+    <form id="indi-devices-form" class="control-panel two-col-form">
+      <label>Science camera
+        <select id="indi-science-camera" name="science_camera">
+          <option value="{{ indi_science_camera }}">{{ indi_science_camera }}</option>
+        </select>
+      </label>
+      <label>Lens / focuser
+        <select id="indi-lens" name="lens">
+          <option value="{{ indi_lens }}">{{ indi_lens }}</option>
+        </select>
+      </label>
+      <div class="button-row span-form">
+        <button>Apply devices</button>
+        <button type="button" class="secondary" data-action="refresh-indi-devices">Refresh device list</button>
+      </div>
+      <p id="indi-device-message" class="form-note span-form">
+        Current runtime selection shown above. Refresh to discover devices currently advertised by indiserver.
+      </p>
+    </form>
+  </article>
   <article class="card span-2 science-camera-card">
     <div class="science-camera-layout">
       <section class="science-camera-controls">
@@ -129,7 +156,7 @@
         <section class="embedded-control-section" aria-labelledby="lens-control-title">
           <div class="card-header">
             <div>
-              <h2 id="lens-control-title">Camera Lens Focus / Pinefeat EF</h2>
+              <h2 id="lens-control-title">Camera Lens Focus / {{ indi_lens }}</h2>
               <p>Instrument-side camera-lens focus position.</p>
             </div>
           </div>

@@ -9,6 +9,7 @@ from werkzeug.exceptions import HTTPException
 from src.config import Config
 from src.data import DataManager
 from src.devices import build_device_bundle
+from src.devices.indi import discover_indi_devices
 from src.devices.base import ExposureAbortedError
 from src.logging_config import configure_logging
 from src.models import ExposureRequest, LensMoveRequest, MotionMoveRequest, TcsGotoRequest
@@ -77,7 +78,7 @@ def create_app():
             error,
             504,
             "INDI device timeout",
-            hint="Check that indiserver is running and that the configured INDI device names match the connected drivers.",
+            hint="Check that indiserver is running and that the selected INDI device names match the connected drivers.",
         )
 
     @app.errorhandler(HTTPException)
@@ -96,9 +97,41 @@ def create_app():
 
     @app.get("/")
     def index():
-        return render_template("index.html",
-                               site_name=app.config["ICS_SITE_NAME"],
-                               js9_asset_base=app.config["ICS_JS9_ASSET_BASE"])
+        indi_device_names = supervisor.indi_device_names()
+        return render_template(
+            "index.html",
+            site_name=app.config["ICS_SITE_NAME"],
+            js9_asset_base=app.config["ICS_JS9_ASSET_BASE"],
+            indi_science_camera=indi_device_names["science_camera"],
+            indi_lens=indi_device_names["lens"],
+        )
+
+    @app.get("/api/indi/devices")
+    def api_indi_devices():
+        return jsonify(
+            {
+                "selected": supervisor.indi_device_names(),
+                "devices": discover_indi_devices(
+                    config.indi_host,
+                    config.indi_port,
+                    min(config.indi_connect_timeout_s, 3.0),
+                ),
+            }
+        )
+
+    @app.post("/api/indi/devices")
+    def api_select_indi_devices():
+        payload = request.get_json() or {}
+        supervisor.set_indi_device_names(
+            str(payload["science_camera"]).strip(),
+            str(payload["lens"]).strip(),
+        )
+        return jsonify(
+            {
+                "selected": supervisor.indi_device_names(),
+                "status": supervisor.snapshot().model_dump(mode="json"),
+            }
+        )
 
     @app.get("/api/status")
     def api_status():

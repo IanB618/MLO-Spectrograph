@@ -244,6 +244,60 @@ function updateMotionAxisOptions(axes) {
   }
 }
 
+function populateDeviceSelect(selectId, names, selected) {
+  const select = document.getElementById(selectId);
+  if (!select) {
+    return;
+  }
+
+  const uniqueNames = [...new Set([selected, ...names].filter(Boolean))];
+  select.replaceChildren();
+  for (const name of uniqueNames) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  }
+  if (selected) {
+    select.value = selected;
+  }
+}
+
+function updateIndiDeviceSelectors(payload) {
+  const devices = payload.devices || [];
+  const allNames = devices.map((device) => device.name);
+  let cameraNames = devices.filter((device) => device.camera).map((device) => device.name);
+  let focuserNames = devices.filter((device) => device.focuser).map((device) => device.name);
+
+  if (!cameraNames.length) {
+    cameraNames = allNames;
+  }
+  if (!focuserNames.length) {
+    focuserNames = allNames;
+  }
+
+  populateDeviceSelect(
+    "indi-science-camera",
+    cameraNames,
+    payload.selected?.science_camera,
+  );
+  populateDeviceSelect(
+    "indi-lens",
+    focuserNames,
+    payload.selected?.lens,
+  );
+}
+
+async function refreshIndiDevices() {
+  const payload = await api("/api/indi/devices");
+  updateIndiDeviceSelectors(payload);
+  const count = payload.devices?.length || 0;
+  setText(
+    "indi-device-message",
+    count === 1 ? "Discovered 1 INDI device." : `Discovered ${count} INDI devices.`,
+  );
+}
+
 function renderLog(log) {
   const target = document.getElementById("log-output");
   if (!log.length) {
@@ -612,6 +666,7 @@ function updateStatus(status) {
   setText("acquisition-message", acquisition.message || (acquisition.connected ? "Connected" : "Offline"));
 
   const lens = status.lens;
+  setText("lens-control-title", `Camera Lens Focus / ${lens.name || "Lens"}`);
   setBadge("lens-state-badge", deviceStateBadge(lens));
   setText("lens-summary", `Position ${lens.position ?? "--"}`);
   setText("lens-note", lens.moving ? "Moving" : "Stationary");
@@ -727,6 +782,10 @@ document.addEventListener("click", (event) => {
   if (action === "abort-exposure") {
     runAndRefresh(() => api("/api/science-camera/abort", {method: "POST"}));
   }
+  if (action === "refresh-indi-devices") {
+    hideError();
+    refreshIndiDevices().catch(showError);
+  }
   if (action === "reload-science-preview") {
     loadLatestSciencePreview({force: true});
   }
@@ -743,6 +802,21 @@ document.addEventListener("click", (event) => {
       });
     });
   }
+});
+
+bindSubmit("indi-devices-form", (event) => {
+  event.preventDefault();
+  const payload = formPayload(event.target);
+  runAndRefresh(async () => {
+    const result = await api("/api/indi/devices", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setText(
+      "indi-device-message",
+      `Using ${result.selected.science_camera} and ${result.selected.lens} for this ICS session.`,
+    );
+  });
 });
 
 bindSubmit("temperature-form", (event) => {

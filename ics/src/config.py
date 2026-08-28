@@ -4,6 +4,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+DEFAULT_INDI_CCD_DEVICE = "FLI Kepler"
+DEFAULT_INDI_FOCUSER_DEVICE = "Pinefeat CEF"
+
+
 class Config:
     def __init__(self):
         load_dotenv()
@@ -15,8 +19,8 @@ class Config:
         self.js9_asset_base = os.getenv("ICS_JS9_ASSET_BASE", "https://js9.sarhatabaot.net").rstrip("/")
         self.indi_host = os.getenv("ICS_INDI_HOST", "127.0.0.1")
         self.indi_port = int(os.getenv("ICS_INDI_PORT", "7624"))
-        self.indi_ccd_device = os.getenv("ICS_INDI_CCD_DEVICE", "FLI Kepler")
-        self.indi_focuser_device = os.getenv("ICS_INDI_FOCUSER_DEVICE", "Pinefeat CEF")
+        self.indi_ccd_device = DEFAULT_INDI_CCD_DEVICE
+        self.indi_focuser_device = DEFAULT_INDI_FOCUSER_DEVICE
         self.indi_blob_property = os.getenv("ICS_INDI_CCD_BLOB_PROPERTY", "CCD1")
         self.indi_connect_timeout_s = float(os.getenv("ICS_INDI_CONNECT_TIMEOUT_S", "10"))
         self.indi_command_timeout_s = float(os.getenv("ICS_INDI_COMMAND_TIMEOUT_S", "30"))
@@ -51,8 +55,6 @@ class Config:
             "ICS_JS9_ASSET_BASE": self.js9_asset_base,
             "ICS_INDI_HOST": self.indi_host,
             "ICS_INDI_PORT": self.indi_port,
-            "ICS_INDI_CCD_DEVICE": self.indi_ccd_device,
-            "ICS_INDI_FOCUSER_DEVICE": self.indi_focuser_device,
             "ICS_INDI_CCD_BLOB_PROPERTY": self.indi_blob_property,
             "ICS_INDI_CONNECT_TIMEOUT_S": self.indi_connect_timeout_s,
             "ICS_INDI_COMMAND_TIMEOUT_S": self.indi_command_timeout_s,

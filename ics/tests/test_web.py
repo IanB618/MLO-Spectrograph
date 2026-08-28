@@ -104,6 +104,8 @@ def test_index_embeds_js9_and_full_width_science_card():
     assert "background-color: transparent !important;" in js9_dark_css
     assert "These containers must remain transparent" in js9_dark_css
     assert 'class="card span-2 science-camera-card"' in html
+    assert 'id="indi-devices-form"' in html
+    assert 'data-action="refresh-indi-devices"' in html
 
 
 def test_lens_controls_place_aperture_beside_absolute_focus():
@@ -111,7 +113,7 @@ def test_lens_controls_place_aperture_beside_absolute_focus():
     app.config.update({"TESTING": True})
     html = app.test_client().get("/").get_data(as_text=True)
 
-    lens_section = html.split("Camera Lens Focus / Pinefeat EF", 1)[1].split(
+    lens_section = html.split("Camera Lens Focus / Pinefeat CEF", 1)[1].split(
         "Recent observation log", 1
     )[0]
     assert "Relative delta" not in lens_section
@@ -198,7 +200,7 @@ def test_science_preview_uses_completed_result_and_refreshes_loaded_image():
     assert "const refreshImage = sciencePreviewState.image;" in app_js
     assert "refresh: refreshImage || false" in app_js
     assert "refresh: force" not in app_js
-    assert "20260814-js9-cdn-fix" in base_html
+    assert "20260827-runtime-indi-devices" in base_html
     assert "loadError: false" in app_js
     assert "sciencePreviewState.loadError = true" in app_js
     assert "if (sciencePreviewState.loadError)" in app_js
@@ -227,3 +229,59 @@ def test_latest_science_fits_rejects_path_outside_data_root(monkeypatch, tmp_pat
     response = app.test_client().get("/api/science-camera/latest.fits")
 
     assert response.status_code == 404
+
+
+def test_indi_device_names_are_runtime_selectable(monkeypatch):
+    app = create_app()
+    app.config.update({"TESTING": True})
+    client = app.test_client()
+
+    response = client.post(
+        "/api/indi/devices",
+        json={"science_camera": "CCD Simulator", "lens": "Focuser Simulator"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["selected"] == {
+        "science_camera": "CCD Simulator",
+        "lens": "Focuser Simulator",
+    }
+    status = client.get("/api/status").get_json()
+    assert status["science_camera"]["name"] == "CCD Simulator"
+    assert status["lens"]["name"] == "Focuser Simulator"
+
+
+def test_indi_device_discovery_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        "src.web.discover_indi_devices",
+        lambda host, port, timeout_s: [
+            {"name": "FLI Kepler", "camera": True, "focuser": False},
+            {"name": "Pinefeat CEF", "camera": False, "focuser": True},
+        ],
+    )
+    app = create_app()
+    app.config.update({"TESTING": True})
+
+    response = app.test_client().get("/api/indi/devices")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["selected"] == {
+        "science_camera": "FLI Kepler",
+        "lens": "Pinefeat CEF",
+    }
+    assert payload["devices"][0]["camera"] is True
+    assert payload["devices"][1]["focuser"] is True
+
+
+def test_indi_device_names_ignore_environment(monkeypatch):
+    from src.config import Config
+
+    monkeypatch.setenv("ICS_INDI_CCD_DEVICE", "Environment CCD")
+    monkeypatch.setenv("ICS_INDI_FOCUSER_DEVICE", "Environment Focuser")
+
+    config = Config()
+
+    assert config.indi_ccd_device == "FLI Kepler"
+    assert config.indi_focuser_device == "Pinefeat CEF"

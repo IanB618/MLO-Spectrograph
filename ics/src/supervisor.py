@@ -43,6 +43,36 @@ class InstrumentSupervisor:
             self.devices.tcs.disconnect()
             self._set_status(SystemState.OFFLINE, "Disconnected")
 
+    def indi_device_names(self) -> dict[str, str]:
+        return {
+            "science_camera": self.devices.science_camera.device_name,
+            "lens": self.devices.lens.device_name,
+        }
+
+    def set_indi_device_names(self, science_camera: str, lens: str):
+        if not self._operation_lock.acquire(blocking=False):
+            raise RuntimeError("Cannot change INDI devices while another instrument operation is in progress")
+        old_names = self.indi_device_names()
+        try:
+            self.devices.science_camera.set_device_name(science_camera)
+            self.devices.lens.set_device_name(lens)
+            self._set_status(
+                message=f"INDI devices selected: science camera '{science_camera}', lens '{lens}'"
+            )
+        except Exception:
+            for device, old_name in (
+                (self.devices.science_camera, old_names["science_camera"]),
+                (self.devices.lens, old_names["lens"]),
+            ):
+                if device.device_name != old_name:
+                    try:
+                        device.set_device_name(old_name)
+                    except Exception:
+                        logger.exception("Could not restore INDI device %s after failed device selection", old_name)
+            raise
+        finally:
+            self._operation_lock.release()
+
     def snapshot(self) -> SystemSnapshot:
         with self._state_lock:
             state = self.state
