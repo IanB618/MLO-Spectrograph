@@ -123,7 +123,9 @@ def update_fits_metadata(request: ExposureRequest, system_status: SystemSnapshot
 
         f[0].header.set("BOX-TEMP", None, "[degC] Instrument enclosure ambient temperature", after="CCD-TEMP") # TODO
         f[0].header.set("CPU-TEMP", get_cpu_temp(), "[degC] Instrument computer processor temperature", after="BOX-TEMP")
-        f[0].header.set("TECPOWER", round(system_status.science_camera.cooler_power_pct, 1), "[%] Thermoelectric cooler power", after="CCD-TEMP")
+        tec_power_pct = system_status.science_camera.cooler_power_pct
+        tec_power_pct = None if tec_power_pct is None else round(tec_power_pct, 1)
+        f[0].header.set("TECPOWER", tec_power_pct, "[%] Thermoelectric cooler power", after="CCD-TEMP")
         if "GAIN" in f[0].header:
             pass
         elif "SBIG" in camera:
