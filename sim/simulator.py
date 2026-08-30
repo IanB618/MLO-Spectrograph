@@ -81,19 +81,10 @@ class DetectorModel:
     nx: int
     ny: int
     pixel_size: u.Quantity
-
-    gain: u.Quantity = field(
-        default_factory=lambda: 1.0 * u.electron / u.adu
-    )
-    read_noise: u.Quantity = field(
-        default_factory=lambda: 0.0 * u.electron
-    )
-    dark_current: u.Quantity = field(
-        default_factory=lambda: 0.0 * u.electron / u.s
-    )
-    bias: u.Quantity = field(
-        default_factory=lambda: 0.0 * u.adu
-    )
+    gain: u.Quantity = 1.0 * u.electron / u.adu
+    read_noise: u.Quantity = 0.0 * u.electron
+    dark_current: u.Quantity = 0.0 * u.electron / u.s
+    bias: u.Quantity = 0.0 * u.adu
     full_well: u.Quantity | None = None
 
     def __post_init__(self) -> None:
@@ -150,12 +141,9 @@ class SpectrographModel:
     collimator_focal_length: u.Quantity
     camera_focal_length: u.Quantity
     fiber_core_diameter: u.Quantity
-
     diffraction_order: int = 1
     fiber_count: int = 1
-    fiber_pitch: u.Quantity = field(
-        default_factory=lambda: 0.0 * u.um
-    )
+    fiber_pitch: u.Quantity = 0.0 * u.um
     wavelength_increases_with_x: bool = False
     kernel_radius_sigma: float = 4.0
     render_sampling_px: float = 0.5
