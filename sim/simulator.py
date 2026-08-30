@@ -77,72 +77,10 @@ class AtmosphericExtinction(ThroughputCurve):
 
 
 @dataclass
-class SpectrographModel:
-    central_wavelength: u.Quantity
-    dispersion: u.Quantity
-    x_center: u.Quantity
-    trace_y: u.Quantity
-
-    fiber_count: int = 1
-    fiber_pitch_px: u.Quantity = field(
-        default_factory=lambda: 0.0 * u.pixel
-    )
-
-    spectral_sigma_px: u.Quantity = field(
-        default_factory=lambda: 2.03 * u.pixel
-    )
-    spatial_sigma_px: u.Quantity = field(
-        default_factory=lambda: 2.25 * u.pixel
-    )
-    kernel_radius_sigma: float = 4.0
-    render_sampling_px: float = 0.5
-
-    trace_func: Callable[[u.Quantity, u.Quantity], u.Quantity] | None = None
-
-    def __post_init__(self) -> None:
-        self.central_wavelength = u.Quantity(self.central_wavelength).to(u.AA)
-        self.dispersion = u.Quantity(self.dispersion).to(u.AA / u.pixel)
-        self.x_center = u.Quantity(self.x_center).to(u.pixel)
-        self.trace_y = u.Quantity(self.trace_y).to(u.pixel)
-        self.fiber_pitch_px = u.Quantity(self.fiber_pitch_px).to(u.pixel)
-        self.spectral_sigma_px = u.Quantity(self.spectral_sigma_px).to(u.pixel)
-        self.spatial_sigma_px = u.Quantity(self.spatial_sigma_px).to(u.pixel)
-
-    def wavelength_to_x(self, wavelength: u.Quantity) -> u.Quantity:
-        wavelength = u.Quantity(wavelength).to(self.central_wavelength.unit)
-        pixel_offset = (
-            (wavelength - self.central_wavelength) / self.dispersion
-        ).to(u.pixel)
-        return self.x_center - pixel_offset
-
-    def fiber_trace_centers(self) -> u.Quantity:
-        offsets = (
-            np.arange(self.fiber_count)
-            - (self.fiber_count - 1) / 2
-        )
-
-        return self.trace_y + offsets * self.fiber_pitch_px
-
-    def wavelength_to_y(
-        self,
-        wavelength: u.Quantity,
-        x: u.Quantity,
-        fiber_trace_y: u.Quantity | None = None,
-    ) -> u.Quantity:
-        if fiber_trace_y is None:
-            fiber_trace_y = self.trace_y
-        if self.trace_func is None:
-            return np.full(x.shape, fiber_trace_y.to_value(u.pixel)) * u.pixel
-
-        return fiber_trace_y + u.Quantity(
-            self.trace_func(wavelength, x)
-        ).to(u.pixel)
-
-
-@dataclass
 class DetectorModel:
     nx: int
     ny: int
+    pixel_size: u.Quantity
 
     gain: u.Quantity = field(
         default_factory=lambda: 1.0 * u.electron / u.adu
@@ -159,6 +97,7 @@ class DetectorModel:
     full_well: u.Quantity | None = None
 
     def __post_init__(self) -> None:
+        self.pixel_size = u.Quantity(self.pixel_size).to(u.um)
         self.gain = u.Quantity(self.gain).to(u.electron / u.adu)
         self.read_noise = u.Quantity(self.read_noise).to(u.electron)
         self.dark_current = u.Quantity(self.dark_current).to(u.electron / u.s)
@@ -179,22 +118,22 @@ class DetectorModel:
         expected_values = np.clip(expected_e.to_value(u.electron), 0, None)
         noisy_e = rng.poisson(expected_values).astype(float) * u.electron
 
-        if self.read_noise_e.value > 0:
+        if self.read_noise.value > 0:
             noisy_e += (
                 rng.normal(
                     0.0,
-                    self.read_noise_e.to_value(u.electron),
+                    self.read_noise.to_value(u.electron),
                     size=noisy_e.shape,
                 )
                 * u.electron
             )
 
-        if self.full_well_e is not None:
+        if self.full_well is not None:
             noisy_e = (
                 np.clip(
                     noisy_e.to_value(u.electron),
                     0,
-                    self.full_well_e.to_value(u.electron),
+                    self.full_well.to_value(u.electron),
                 )
                 * u.electron
             )
@@ -202,15 +141,178 @@ class DetectorModel:
         return (noisy_e / self.gain).to(u.adu) + self.bias
 
 
+@dataclass
+class SpectrographModel:
+    detector: DetectorModel
+    groove_density: u.Quantity
+    incidence_angle: u.Quantity
+    diffraction_angle: u.Quantity
+    collimator_focal_length: u.Quantity
+    camera_focal_length: u.Quantity
+    fiber_core_diameter: u.Quantity
+
+    diffraction_order: int = 1
+    fiber_count: int = 1
+    fiber_pitch: u.Quantity = field(
+        default_factory=lambda: 0.0 * u.um
+    )
+    wavelength_increases_with_x: bool = False
+    kernel_radius_sigma: float = 4.0
+    render_sampling_px: float = 0.5
+
+    trace_func: Callable[[u.Quantity, u.Quantity], u.Quantity] | None = None
+
+    def __post_init__(self) -> None:
+        self.groove_density = u.Quantity(self.groove_density).to(1 / u.mm)
+        self.incidence_angle = u.Quantity(self.incidence_angle).to(u.deg)
+        self.diffraction_angle = u.Quantity(self.diffraction_angle).to(u.deg)
+        self.collimator_focal_length = u.Quantity(
+            self.collimator_focal_length
+        ).to(u.mm)
+        self.camera_focal_length = u.Quantity(self.camera_focal_length).to(u.mm)
+        self.fiber_core_diameter = u.Quantity(self.fiber_core_diameter).to(u.um)
+        self.fiber_pitch = u.Quantity(self.fiber_pitch).to(u.um)
+
+        if self.diffraction_order == 0:
+            raise ValueError("diffraction_order must be non-zero.")
+        if self.fiber_count < 1:
+            raise ValueError("fiber_count must be at least 1.")
+        if self.render_sampling_px <= 0:
+            raise ValueError("render_sampling_px must be positive.")
+
+    @property
+    def groove_spacing(self) -> u.Quantity:
+        return (1 / self.groove_density).to(u.mm)
+
+    @property
+    def central_wavelength(self) -> u.Quantity:
+        wavelength = (
+            self.groove_spacing
+            * (
+                np.sin(self.incidence_angle)
+                + np.sin(self.diffraction_angle)
+            )
+            / self.diffraction_order
+        )
+        return wavelength.to(u.AA)
+
+    @property
+    def dispersion(self) -> u.Quantity:
+        dispersion = (
+            self.groove_spacing
+            * np.cos(self.diffraction_angle)
+            / (self.diffraction_order * self.camera_focal_length)
+            * self.detector.pixel_size
+            / u.pixel
+        )
+        return dispersion.to(u.AA / u.pixel)
+
+    @property
+    def x_center(self) -> u.Quantity:
+        return (self.detector.nx - 1) / 2 * u.pixel
+
+    @property
+    def trace_y(self) -> u.Quantity:
+        return (self.detector.ny - 1) / 2 * u.pixel
+
+    @property
+    def magnification(self) -> u.Quantity:
+        return (
+            self.camera_focal_length / self.collimator_focal_length
+        ).to(u.dimensionless_unscaled)
+
+    @property
+    def anamorphic_factor(self) -> u.Quantity:
+        return (
+            np.cos(self.incidence_angle) / np.cos(self.diffraction_angle)
+        ).to(u.dimensionless_unscaled)
+
+    @property
+    def fiber_pitch_px(self) -> u.Quantity:
+        pitch_pixels = (
+            self.fiber_pitch
+            * self.magnification
+            / self.detector.pixel_size
+        ).to_value(u.dimensionless_unscaled)
+        return pitch_pixels * u.pixel
+
+    @property
+    def spatial_fwhm_px(self) -> u.Quantity:
+        width_pixels = (
+            self.fiber_core_diameter
+            * self.magnification
+            / self.detector.pixel_size
+        ).to_value(u.dimensionless_unscaled)
+        return width_pixels * u.pixel
+
+    @property
+    def spectral_fwhm_px(self) -> u.Quantity:
+        return self.spatial_fwhm_px * self.anamorphic_factor
+
+    @property
+    def spatial_sigma_px(self) -> u.Quantity:
+        return self.spatial_fwhm_px / (2 * np.sqrt(2 * np.log(2)))
+
+    @property
+    def spectral_sigma_px(self) -> u.Quantity:
+        return self.spectral_fwhm_px / (2 * np.sqrt(2 * np.log(2)))
+
+    def wavelength_to_x(self, wavelength: u.Quantity) -> u.Quantity:
+        wavelength = u.Quantity(wavelength).to(self.groove_spacing.unit)
+        sin_diffraction_angle = (
+            self.diffraction_order * wavelength / self.groove_spacing
+            - np.sin(self.incidence_angle)
+        ).to_value(u.dimensionless_unscaled)
+
+        if np.any(np.abs(sin_diffraction_angle) > 1):
+            raise ValueError(
+                "At least one wavelength is not physically reachable for the "
+                "configured grating geometry."
+            )
+
+        diffraction_angle = np.arcsin(sin_diffraction_angle) * u.rad
+        field_angle = diffraction_angle - self.diffraction_angle
+        detector_offset = (
+            self.camera_focal_length
+            * np.tan(field_angle)
+            / self.detector.pixel_size
+        ).to_value(u.dimensionless_unscaled) * u.pixel
+
+        if self.wavelength_increases_with_x:
+            return self.x_center + detector_offset
+        return self.x_center - detector_offset
+
+    def fiber_trace_centers(self) -> u.Quantity:
+        offsets = (
+            np.arange(self.fiber_count)
+            - (self.fiber_count - 1) / 2
+        )
+        return self.trace_y + offsets * self.fiber_pitch_px
+
+    def wavelength_to_y(
+        self,
+        wavelength: u.Quantity,
+        x: u.Quantity,
+        fiber_trace_y: u.Quantity | None = None,
+    ) -> u.Quantity:
+        if fiber_trace_y is None:
+            fiber_trace_y = self.trace_y
+        if self.trace_func is None:
+            return np.full(x.shape, fiber_trace_y.to_value(u.pixel)) * u.pixel
+
+        return fiber_trace_y + u.Quantity(
+            self.trace_func(wavelength, x)
+        ).to(u.pixel)
+
+
 class InstrumentSimulator:
     def __init__(
         self,
         spectrograph: SpectrographModel,
-        detector: DetectorModel,
         throughputs: list[ThroughputCurve],
     ) -> None:
         self.spectrograph = spectrograph
-        self.detector = detector
+        self.detector = spectrograph.detector
         self.throughputs = throughputs
 
     def combined_throughput(self, wavelength: u.Quantity) -> np.ndarray:
