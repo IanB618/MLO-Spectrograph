@@ -1,6 +1,7 @@
 # MLO Spectrograph
 
-Shared repo for [SDSU MLO](https://astronomy.sdsu.edu/mount-laguna-observatory-facilities/) Spectrograph code.
+Legacy shared repo for [SDSU MLO](https://astronomy.sdsu.edu/mount-laguna-observatory-facilities/) Spectrograph code.
+Each application now has its own repository within the [MLO Claud Spectrograph organization](https://github.com/MLO-Claud-Spectrograph).
 
 ### Contents
 
